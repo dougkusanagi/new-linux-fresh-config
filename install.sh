@@ -23,10 +23,15 @@ else
   echo "Only installing terminal tools..."
 fi
 
+# Multimedia codecs and fonts
 sudo apt-get install -y ubuntu-restricted-extras
 
 # snapd
 sudo apt install -y snapd
+
+# Necessary to open AppImage files
+sudo add-apt-repository -y universe
+sudo apt install -y libfuse2t64
 
 # Flatpak installation
 sudo apt install -y flatpak
@@ -45,10 +50,6 @@ flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.f
 
 # Para desabilitar função de "colar" com click do botão do meio do mouse
 sudo apt install gnome-tweaks
-
-# Necessary to open AppImage files
-sudo add-apt-repository -y universe
-sudo apt install -y libfuse2t64
 
 # Podman
 sudo apt-get update
