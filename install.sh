@@ -1,4 +1,6 @@
 #!/bin/bash
+
+# Exit immediately if a command exits with a non-zero status
 set -e
 
 echo "This is a very opinionated basic dev environment with PHP, Composer, Node, Valet and many desktop apps"
@@ -15,10 +17,6 @@ if $RUNNING_GNOME; then
   # Ensure computer doesn't go to sleep or lock while installing
   gsettings set org.gnome.desktop.screensaver lock-enabled false
   gsettings set org.gnome.desktop.session idle-delay 0
-
-  # echo "Get ready to make a few choices..."
-  # source ~/.local/share/omakub/install/terminal/required/app-gum.sh >/dev/null
-  # source ~/.local/share/omakub/install/first-run-choices.sh
 
   echo "Installing terminal and desktop tools..."
 else
@@ -121,3 +119,7 @@ sudo apt install -y network-manager libnss3-tools jq xsel
 
 # Valet Install
 composer global require cpriego/valet-linux
+
+# Revert to normal idle and lock settings
+gsettings set org.gnome.desktop.screensaver lock-enabled true
+gsettings set org.gnome.desktop.session idle-delay 300
