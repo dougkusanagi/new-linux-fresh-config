@@ -76,6 +76,24 @@ EOF
     # Zen Browser
     flatpak install --or-update -y flathub io.github.zen_browser.zen
 
+    # Configure Print Screen shortcut for Flameshot
+    # This matches the GUI settings: Name=PrintScrn, Command="flameshot gui", Shortcut=Print
+    existing_bindings=$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings)
+    target_path="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom-flameshot/"
+
+    if [[ "$existing_bindings" != *"$target_path"* ]]; then
+        if [[ "$existing_bindings" == "[]" || "$existing_bindings" == "@as []" ]]; then
+            new_bindings="['$target_path']"
+        else
+            new_bindings=$(echo "$existing_bindings" | sed "s/] */, '$target_path']/")
+        fi
+        gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "$new_bindings"
+    fi
+
+    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$target_path name 'PrintScrn'
+    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$target_path command 'flameshot gui'
+    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$target_path binding 'Print'
+
     # Obsidian
     flatpak install --or-update -y md.obsidian.Obsidian
 
