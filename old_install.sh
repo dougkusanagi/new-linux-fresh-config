@@ -48,6 +48,19 @@ if $RUNNING_GNOME; then
     # Para desabilitar função de "colar" com click do botão do meio do mouse
     sudo apt install gnome-tweaks
 
+    # eza CLI (https://github.com/eza-community/eza)
+    sudo apt update
+    sudo apt install -y gpg
+    sudo mkdir -p /etc/apt/keyrings
+    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
+    sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
+    sudo apt update
+    sudo apt install -y eza
+
+    # Alias ls to eza in ~/.bashrc
+    echo 'alias ls="eza"' >> ~/.bashrc
+
     # Podman
     sudo apt-get update
     sudo apt-get -y install podman
