@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+section "GNOME Tweaks"
 log "Configuring Flameshot shortcut..."
 existing_bindings="$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings)"
 target_path="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom-flameshot/"
@@ -18,3 +19,4 @@ fi
 gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$target_path name 'PrintScrn'
 gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$target_path command 'flameshot gui'
 gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$target_path binding 'Print'
+success "Flameshot shortcut configured"

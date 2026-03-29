@@ -20,19 +20,86 @@ SUPPORTED_THEMES=(
   "osaka-jade"
 )
 
+if [[ -t 1 ]]; then
+  COLOR_RESET=$'\033[0m'
+  COLOR_BOLD=$'\033[1m'
+  COLOR_DIM=$'\033[2m'
+  COLOR_BLUE=$'\033[34m'
+  COLOR_GREEN=$'\033[32m'
+  COLOR_YELLOW=$'\033[33m'
+  COLOR_RED=$'\033[31m'
+else
+  COLOR_RESET=""
+  COLOR_BOLD=""
+  COLOR_DIM=""
+  COLOR_BLUE=""
+  COLOR_GREEN=""
+  COLOR_YELLOW=""
+  COLOR_RED=""
+fi
+
+section() {
+  printf "\n%s%s%s\n" "${COLOR_BOLD}${COLOR_BLUE}" "$*" "${COLOR_RESET}"
+}
+
 log() {
-  echo "[INFO] $*"
+  printf "%s->%s %s\n" "${COLOR_DIM}" "${COLOR_RESET}" "$*"
+}
+
+success() {
+  printf "%sOK%s %s\n" "${COLOR_GREEN}" "${COLOR_RESET}" "$*"
 }
 
 warn() {
-  echo "[WARN] $*" >&2
+  printf "%sWARN%s %s\n" "${COLOR_YELLOW}" "${COLOR_RESET}" "$*" >&2
 }
 
 error() {
-  echo "[ERROR] $*" >&2
+  printf "%sERROR%s %s\n" "${COLOR_RED}" "${COLOR_RESET}" "$*" >&2
+}
+
+join_by() {
+  local delimiter="$1"
+  shift
+
+  local first="true"
+  local item
+  for item in "$@"; do
+    if [[ "$first" == "true" ]]; then
+      printf "%s" "$item"
+      first="false"
+    else
+      printf "%s%s" "$delimiter" "$item"
+    fi
+  done
+}
+
+run_quiet() {
+  local log_file exit_code
+  log_file="$(mktemp)"
+
+  if "$@" >"$log_file" 2>&1; then
+    rm -f "$log_file"
+    return 0
+  fi
+
+  exit_code=$?
+  error "Command failed: $*"
+  sed -n '1,120p' "$log_file" >&2 || true
+  rm -f "$log_file"
+  return "$exit_code"
 }
 
 require_sudo() {
+  if sudo -n true 2>/dev/null; then
+    return
+  fi
+
+  if [[ ! -t 0 ]]; then
+    error "sudo needs a password, but no interactive TTY is available."
+    exit 1
+  fi
+
   sudo -v
 }
 
@@ -40,8 +107,15 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+apt_update() {
+  run_quiet sudo apt-get update -y
+  success "Package index updated"
+}
+
 apt_install() {
-  sudo apt-get install -y "$@"
+  local packages=("$@")
+  run_quiet sudo apt-get install -y "${packages[@]}"
+  success "Apt ready: $(join_by ', ' "${packages[@]}")"
 }
 
 normalize_theme_name() {
@@ -81,11 +155,11 @@ flatpak_install_app() {
   local app_id="$1"
 
   if flatpak info "$app_id" >/dev/null 2>&1; then
-    log "Updating Flatpak: $app_id"
-    flatpak update -y "$app_id"
+    run_quiet flatpak update -y "$app_id"
+    success "Flatpak updated: $app_id"
   else
-    log "Installing Flatpak: $app_id"
-    flatpak install -y flathub "$app_id"
+    run_quiet flatpak install -y flathub "$app_id"
+    success "Flatpak installed: $app_id"
   fi
 }
 
@@ -99,12 +173,12 @@ download_file() {
 
 install_dust() {
   if command_exists dust; then
-    log "dust is already installed."
+    log "dust is already available."
     return
   fi
 
-  log "Installing dust using the official installer..."
-  curl -sSfL https://raw.githubusercontent.com/bootandy/dust/refs/heads/master/install.sh | sh
+  run_quiet bash -lc 'curl -sSfL https://raw.githubusercontent.com/bootandy/dust/refs/heads/master/install.sh | sh'
+  success "dust installed"
 }
 
 detect_desktop() {
@@ -163,6 +237,7 @@ apply_selected_theme() {
 
   # shellcheck source=/dev/null
   source "$theme_dir/gnome.sh"
+  success "Theme applied: $theme"
 }
 
 finish_installation() {

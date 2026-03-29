@@ -122,3 +122,32 @@ Use os dois testes:
 
 - `./test.sh` para regressão rápida em VM limpa
 - VM Desktop manual para validar integração real do ambiente gráfico
+
+## Troubleshooting
+
+### Multipass cai logo ao iniciar
+
+Se o host estiver com `/etc/resolv.conf` apontando para `Valet Linux`, o `multipassd` pode falhar ao subir o `dnsmasq`.
+
+Sinal típico:
+
+- `failed to open file ... multipass_root_cert.pem`
+- `snap services multipass` alternando entre `active` e `inactive`
+- `journalctl -u snap.multipass.multipassd` mostrando erro do `dnsmasq`
+
+No host afetado, verifique:
+
+```bash
+ls -l /etc/resolv.conf
+```
+
+Se ele apontar para algo como `/opt/valet-linux/resolv.conf`, troque temporariamente para um arquivo regular e rode o teste de novo:
+
+```bash
+sudo rm -f /etc/resolv.conf
+printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' | sudo tee /etc/resolv.conf >/dev/null
+sudo snap restart multipass.multipassd
+./test.sh
+```
+
+Depois do teste, restaure o setup do Valet se você ainda precisar dele.

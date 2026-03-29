@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+section "Fonts"
+
 FONT_SOURCE_DIR="$INSTALL_ROOT/fonts"
 FONT_DEST_DIR="$TARGET_HOME/.local/share/fonts/new-linux-fresh-config"
 
@@ -16,7 +18,8 @@ while IFS= read -r -d '' font_file; do
 done < <(find "$FONT_SOURCE_DIR" -maxdepth 1 -type f \( -iname '*.ttf' -o -iname '*.otf' \) -print0)
 
 if command -v fc-cache >/dev/null 2>&1; then
-  fc-cache -f "$FONT_DEST_DIR"
+  run_quiet fc-cache -f "$FONT_DEST_DIR"
+  success "Font cache refreshed"
 else
   warn "fc-cache is not available. Refresh the font cache manually if needed."
 fi

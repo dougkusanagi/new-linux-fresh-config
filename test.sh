@@ -13,6 +13,7 @@ VM_MEMORY="4G"
 VM_DISK="30G"
 VM_WORKDIR="/home/ubuntu/workspace"
 KEEP_VM="false"
+MULTIPASS_CERT_PATH="/var/snap/multipass/common/data/multipassd/multipass_root_cert.pem"
 
 log() {
   echo "[INFO] $*"
@@ -119,6 +120,23 @@ require_script() {
   }
 }
 
+check_multipass_host_prereqs() {
+  local resolv_target
+  resolv_target="$(readlink -f /etc/resolv.conf 2>/dev/null || true)"
+
+  if [[ "$resolv_target" == /opt/valet-linux/* ]]; then
+    error "Multipass cannot start while /etc/resolv.conf points to Valet Linux: $resolv_target"
+    warn "Your current DNS servers from NetworkManager are:"
+    nmcli dev show 2>/dev/null | rg 'IP4.DNS|IP6.DNS' >&2 || true
+    warn "Temporarily replace /etc/resolv.conf with a regular file, then retry ./test.sh."
+    warn "Example:"
+    warn "  sudo rm -f /etc/resolv.conf"
+    warn "  printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' | sudo tee /etc/resolv.conf >/dev/null"
+    warn "After testing, restore the Valet setup if you still need it."
+    exit 1
+  fi
+}
+
 detect_container_engine() {
   if command_exists podman; then
     CONTAINER_ENGINE="podman"
@@ -132,6 +150,13 @@ detect_container_engine() {
 
 ensure_multipass() {
   if command_exists multipass; then
+    if multipass_ready; then
+      log "Multipass is already ready."
+      return
+    fi
+
+    start_multipass_daemon
+    wait_for_multipass_ready
     return
   fi
 
@@ -142,6 +167,61 @@ ensure_multipass() {
 
   log "Installing Multipass via snap..."
   sudo snap install multipass
+  start_multipass_daemon
+  wait_for_multipass_ready
+}
+
+start_multipass_daemon() {
+  if multipass_ready; then
+    log "Multipass daemon is already running."
+    return
+  fi
+
+  log "Ensuring the Multipass daemon is running..."
+  sudo snap start multipass.multipassd >/dev/null 2>&1 \
+    || sudo snap restart multipass.multipassd >/dev/null 2>&1 \
+    || true
+}
+
+multipass_ready() {
+  local service_state
+
+  service_state="$(
+    snap services multipass 2>/dev/null \
+      | awk 'NR > 1 {print $3}' \
+      | head -n 1
+  )"
+
+  [[ "$service_state" == "active" ]] \
+    && [[ -f "$MULTIPASS_CERT_PATH" ]] \
+    && multipass find >/dev/null 2>&1
+}
+
+do_launch_vm() {
+  multipass launch "$VM_RELEASE" \
+    --name "$VM_NAME" \
+    --cpus "$VM_CPUS" \
+    --memory "$VM_MEMORY" \
+    --disk "$VM_DISK"
+}
+
+wait_for_multipass_ready() {
+  local attempt max_attempts
+  max_attempts=30
+
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    if multipass_ready; then
+      log "Multipass is ready."
+      return
+    fi
+
+    sleep 2
+  done
+
+  error "Multipass did not become ready after installation/startup."
+  snap services multipass >&2 || true
+  warn "Try running: sudo snap restart multipass.multipassd"
+  exit 1
 }
 
 container_cleanup() {
@@ -212,12 +292,18 @@ launch_vm() {
     multipass delete --purge "$VM_NAME" >/dev/null 2>&1 || multipass delete "$VM_NAME" >/dev/null 2>&1 || true
   fi
 
+  log "Refreshing Multipass image catalog..."
+  multipass find >/dev/null 2>&1 || true
+
   log "Launching Ubuntu $VM_RELEASE VM '$VM_NAME'..."
-  multipass launch "$VM_RELEASE" \
-    --name "$VM_NAME" \
-    --cpus "$VM_CPUS" \
-    --memory "$VM_MEMORY" \
-    --disk "$VM_DISK"
+  if ! do_launch_vm; then
+    warn "First launch attempt failed. Refreshing catalog and retrying once..."
+    if vm_exists; then
+      multipass delete --purge "$VM_NAME" >/dev/null 2>&1 || multipass delete "$VM_NAME" >/dev/null 2>&1 || true
+    fi
+    multipass find >/dev/null 2>&1 || true
+    do_launch_vm
+  fi
 }
 
 mount_workspace() {
@@ -227,6 +313,7 @@ mount_workspace() {
 }
 
 run_vm_test() {
+  check_multipass_host_prereqs
   ensure_multipass
   warn "Multipass mode validates a clean Ubuntu VM and the CLI path of the installer."
   warn "For GNOME, Nautilus Share, Samba reboot, fonts, and themes, follow the manual desktop checklist in test-vm.md."
