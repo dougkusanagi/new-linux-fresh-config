@@ -36,7 +36,7 @@ if $RUNNING_GNOME; then
     flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
     # Samba + Nautilus Share
-    sudo apt install -y samba nautilus-share
+    sudo apt install -y samba smbclient nautilus-share
     sudo adduser "$USER" sambashare
     sudo mkdir -p /var/lib/samba/usershares
     sudo chown root:sambashare /var/lib/samba/usershares

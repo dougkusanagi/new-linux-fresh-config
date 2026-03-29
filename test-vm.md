@@ -111,6 +111,7 @@ chmod +x install.sh
 - fontes copiadas para `~/.local/share/fonts/new-linux-fresh-config`
 - `fc-cache` executado sem erro
 - `samba` instalado
+- `smbclient` instalado
 - usuário no grupo `sambashare`
 - `nautilus-share` disponível no Nautilus
 - tema aplicado no GNOME

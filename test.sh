@@ -15,16 +15,58 @@ VM_WORKDIR="/home/ubuntu/workspace"
 KEEP_VM="false"
 MULTIPASS_CERT_PATH="/var/snap/multipass/common/data/multipassd/multipass_root_cert.pem"
 
+if [[ -t 1 ]]; then
+  COLOR_RESET=$'\033[0m'
+  COLOR_BOLD=$'\033[1m'
+  COLOR_DIM=$'\033[2m'
+  COLOR_BLUE=$'\033[34m'
+  COLOR_GREEN=$'\033[32m'
+  COLOR_YELLOW=$'\033[33m'
+  COLOR_RED=$'\033[31m'
+else
+  COLOR_RESET=""
+  COLOR_BOLD=""
+  COLOR_DIM=""
+  COLOR_BLUE=""
+  COLOR_GREEN=""
+  COLOR_YELLOW=""
+  COLOR_RED=""
+fi
+
+section() {
+  printf "\n%s%s%s\n" "${COLOR_BOLD}${COLOR_BLUE}" "$*" "${COLOR_RESET}"
+}
+
 log() {
-  echo "[INFO] $*"
+  printf "%s->%s %s\n" "${COLOR_DIM}" "${COLOR_RESET}" "$*"
+}
+
+success() {
+  printf "%sOK%s %s\n" "${COLOR_GREEN}" "${COLOR_RESET}" "$*"
 }
 
 warn() {
-  echo "[WARN] $*" >&2
+  printf "%sWARN%s %s\n" "${COLOR_YELLOW}" "${COLOR_RESET}" "$*" >&2
 }
 
 error() {
-  echo "[ERROR] $*" >&2
+  printf "%sERROR%s %s\n" "${COLOR_RED}" "${COLOR_RESET}" "$*" >&2
+}
+
+run_quiet() {
+  local log_file exit_code
+  log_file="$(mktemp)"
+
+  if "$@" >"$log_file" 2>&1; then
+    rm -f "$log_file"
+    return 0
+  fi
+
+  exit_code=$?
+  error "Command failed: $*"
+  sed -n '1,120p' "$log_file" >&2 || true
+  rm -f "$log_file"
+  return "$exit_code"
 }
 
 usage() {
@@ -151,7 +193,7 @@ detect_container_engine() {
 ensure_multipass() {
   if command_exists multipass; then
     if multipass_ready; then
-      log "Multipass is already ready."
+      success "Multipass is already ready"
       return
     fi
 
@@ -166,7 +208,8 @@ ensure_multipass() {
   fi
 
   log "Installing Multipass via snap..."
-  sudo snap install multipass
+  run_quiet sudo snap install multipass
+  success "Multipass installed"
   start_multipass_daemon
   wait_for_multipass_ready
 }
@@ -198,7 +241,7 @@ multipass_ready() {
 }
 
 do_launch_vm() {
-  multipass launch "$VM_RELEASE" \
+  run_quiet multipass launch "$VM_RELEASE" \
     --name "$VM_NAME" \
     --cpus "$VM_CPUS" \
     --memory "$VM_MEMORY" \
@@ -211,7 +254,7 @@ wait_for_multipass_ready() {
 
   for ((attempt = 1; attempt <= max_attempts; attempt++)); do
     if multipass_ready; then
-      log "Multipass is ready."
+      success "Multipass is ready"
       return
     fi
 
@@ -255,6 +298,7 @@ cleanup() {
 }
 
 run_container_test() {
+  section "Container Test"
   detect_container_engine
 
   log "Using container engine: $CONTAINER_ENGINE"
@@ -263,7 +307,7 @@ run_container_test() {
 
   container_cleanup
 
-  "$CONTAINER_ENGINE" run --name "$CONTAINER_NAME" --rm \
+  run_quiet "$CONTAINER_ENGINE" run --name "$CONTAINER_NAME" --rm \
     -v "$PWD:/workspace" \
     -w /workspace \
     "$CONTAINER_IMAGE" \
@@ -284,6 +328,7 @@ run_container_test() {
       chmod +x '$SCRIPT_NAME'
       ./'$SCRIPT_NAME'
     "
+  success "Container smoke test completed"
 }
 
 launch_vm() {
@@ -293,7 +338,7 @@ launch_vm() {
   fi
 
   log "Refreshing Multipass image catalog..."
-  multipass find >/dev/null 2>&1 || true
+  run_quiet multipass find || true
 
   log "Launching Ubuntu $VM_RELEASE VM '$VM_NAME'..."
   if ! do_launch_vm; then
@@ -301,18 +346,21 @@ launch_vm() {
     if vm_exists; then
       multipass delete --purge "$VM_NAME" >/dev/null 2>&1 || multipass delete "$VM_NAME" >/dev/null 2>&1 || true
     fi
-    multipass find >/dev/null 2>&1 || true
+    run_quiet multipass find || true
     do_launch_vm
   fi
+  success "VM launched: $VM_NAME"
 }
 
 mount_workspace() {
   log "Mounting repository into the VM..."
-  multipass exec "$VM_NAME" -- mkdir -p "$VM_WORKDIR"
-  multipass mount "$PWD" "$VM_NAME:$VM_WORKDIR"
+  run_quiet multipass exec "$VM_NAME" -- mkdir -p "$VM_WORKDIR"
+  run_quiet multipass mount "$PWD" "$VM_NAME:$VM_WORKDIR"
+  success "Repository mounted in VM"
 }
 
 run_vm_test() {
+  section "Multipass Test"
   check_multipass_host_prereqs
   ensure_multipass
   warn "Multipass mode validates a clean Ubuntu VM and the CLI path of the installer."
@@ -321,7 +369,8 @@ run_vm_test() {
   launch_vm
   mount_workspace
 
-  multipass exec "$VM_NAME" -- bash -lc "
+  section "VM Bootstrap"
+  run_quiet multipass exec "$VM_NAME" -- bash -lc "
     set -Eeuo pipefail
     export DEBIAN_FRONTEND=noninteractive
 
@@ -329,17 +378,33 @@ run_vm_test() {
 
     sudo apt-get update
     sudo apt-get install -y bash ca-certificates curl git jq sudo wget software-properties-common xsel unzip fontconfig
+  "
+  success "Bootstrap packages ready in VM"
 
-    echo '[INFO] Validating shell syntax...'
+  log "Validating installer syntax in VM..."
+  run_quiet multipass exec "$VM_NAME" -- bash -lc "
+    set -Eeuo pipefail
+    cd '$VM_WORKDIR'
     bash -n '$SCRIPT_NAME' install/lib.sh install/terminal.sh install/desktop.sh install/terminal/*.sh install/desktop/*.sh
+  "
+  success "Installer syntax validated"
 
-    echo '[INFO] Validating theme list...'
+  log "Validating theme list in VM..."
+  run_quiet multipass exec "$VM_NAME" -- bash -lc "
+    set -Eeuo pipefail
+    cd '$VM_WORKDIR'
     ./'$SCRIPT_NAME' --list-themes >/dev/null
+  "
+  success "Theme list validated"
 
-    echo '[INFO] Executing installer inside the Ubuntu VM...'
+  section "Installer"
+  multipass exec "$VM_NAME" -- bash -lc "
+    set -Eeuo pipefail
+    cd '$VM_WORKDIR'
     chmod +x '$SCRIPT_NAME'
     ./'$SCRIPT_NAME'
   "
+  success "Installer completed in VM"
 }
 
 main() {

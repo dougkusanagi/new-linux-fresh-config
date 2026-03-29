@@ -107,6 +107,10 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+apt_package_installed() {
+  dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "install ok installed"
+}
+
 apt_update() {
   run_quiet sudo apt-get update -y
   success "Package index updated"
@@ -114,8 +118,27 @@ apt_update() {
 
 apt_install() {
   local packages=("$@")
-  run_quiet sudo apt-get install -y "${packages[@]}"
-  success "Apt ready: $(join_by ', ' "${packages[@]}")"
+  local missing_packages=()
+  local package
+
+  for package in "${packages[@]}"; do
+    if apt_package_installed "$package"; then
+      log "$package is already installed."
+    else
+      log "Installing $package..."
+      missing_packages+=("$package")
+    fi
+  done
+
+  if [[ "${#missing_packages[@]}" -eq 0 ]]; then
+    return
+  fi
+
+  run_quiet sudo apt-get install -y "${missing_packages[@]}"
+
+  for package in "${missing_packages[@]}"; do
+    success "$package installed"
+  done
 }
 
 normalize_theme_name() {
