@@ -6,12 +6,17 @@ sudo apt-get update -y
 log "Installing base packages..."
 apt_install \
   bat \
+  btm \
+  fd-find \
   git \
   curl \
   wget \
   gpg \
   ca-certificates \
+  ripgrep \
+  sd \
   software-properties-common \
+  tealdeer \
   apt-transport-https \
   jq \
   xsel \
@@ -39,6 +44,10 @@ sudo apt-get update -y
 apt_install eza
 add_line_if_missing 'alias ls="eza"' "$TARGET_HOME/.bashrc"
 add_line_if_missing 'alias bat="batcat"' "$TARGET_HOME/.bashrc"
+add_line_if_missing 'alias fd="fdfind"' "$TARGET_HOME/.bashrc"
+add_line_if_missing 'alias bottom="btm"' "$TARGET_HOME/.bashrc"
+
+install_dust
 
 log "Installing Podman..."
 apt_install podman

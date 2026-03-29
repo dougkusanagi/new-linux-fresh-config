@@ -97,6 +97,16 @@ download_file() {
   curl -fsSL "$url" -o "$destination"
 }
 
+install_dust() {
+  if command_exists dust; then
+    log "dust is already installed."
+    return
+  fi
+
+  log "Installing dust using the official installer..."
+  curl -sSfL https://raw.githubusercontent.com/bootandy/dust/refs/heads/master/install.sh | sh
+}
+
 detect_desktop() {
   if [[ "${XDG_CURRENT_DESKTOP:-}" == *"GNOME"* ]]; then
     RUNNING_GNOME="true"
