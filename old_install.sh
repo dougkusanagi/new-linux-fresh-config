@@ -35,11 +35,19 @@ if $RUNNING_GNOME; then
     sudo apt install -y gnome-software-plugin-flatpak
     flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
+    # Samba + Nautilus Share
+    sudo apt install -y samba nautilus-share
+    sudo adduser "$USER" sambashare
+    sudo mkdir -p /var/lib/samba/usershares
+    sudo chown root:sambashare /var/lib/samba/usershares
+    sudo chmod 1770 /var/lib/samba/usershares
+    sudo systemctl restart smbd
+
     # Github CLI (gh)
     (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
         && sudo mkdir -p -m 755 /etc/apt/keyrings \
-            && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-            && cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+            && out=$(mktemp) && wget -nv -O"$out" https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            && cat "$out" | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
         && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
         && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
         && sudo apt update \
@@ -98,7 +106,8 @@ EOF
         if [[ "$existing_bindings" == "[]" || "$existing_bindings" == "@as []" ]]; then
             new_bindings="['$target_path']"
         else
-            new_bindings=$(echo "$existing_bindings" | sed "s/] */, '$target_path']/")
+            new_bindings="${existing_bindings%]}"
+            new_bindings="${new_bindings}, '$target_path']"
         fi
         gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "$new_bindings"
     fi
@@ -145,7 +154,7 @@ EOF
     export PATH="$HOME/.config/composer/vendor/bin:$PATH"
 
     # Set up Composer path
-    echo 'export PATH="$HOME/.config/composer/vendor/bin:$PATH"' >> ~/.bashrc
+    echo "export PATH=\"\$HOME/.config/composer/vendor/bin:\$PATH\"" >> ~/.bashrc
 
     # Valet Prerequisites
     sudo apt install -y network-manager libnss3-tools jq xsel
@@ -160,7 +169,10 @@ EOF
     # Revert to normal idle and lock settings
     gsettings set org.gnome.desktop.screensaver lock-enabled true
     gsettings set org.gnome.desktop.session idle-delay 300
+
+    echo
+    echo "Samba e Nautilus Share foram configurados."
+    echo "Reinicie o computador ao final da instalação para aplicar o grupo sambashare."
 else
     echo "Only installing terminal tools..."
 fi
-
