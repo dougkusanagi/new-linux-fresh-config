@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 section "Web Stack"
-apt_update
+dnf_update
 
-apt_install \
+dnf_install \
   php \
   php-cli \
   php-fpm \
@@ -12,30 +12,30 @@ apt_install \
   php-xml \
   php-curl \
   php-gd \
-  php-imagick \
-  php-zip \
+  php-pecl-imagick \
+  php-pecl-zip \
   php-bcmath \
   php-intl \
-  php-mysql \
+  php-mysqlnd \
   php-pgsql \
-  php-sqlite3 \
-  php-redis \
-  php-dom \
+  php-pdo \
+  php-pecl-redis5 \
   php-opcache \
   php-soap \
-  mysql-server
+  php-process \
+  mariadb-server
 
 if command -v systemctl >/dev/null 2>&1; then
-  log "Enabling MySQL service..."
-  sudo systemctl enable mysql || true
-  sudo systemctl start mysql || true
-  success "MySQL service enabled"
+  log "Enabling MariaDB service..."
+  sudo systemctl enable mariadb || true
+  sudo systemctl start mariadb || true
+  success "MariaDB service enabled"
 fi
 
-if run_quiet sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY ''; FLUSH PRIVILEGES;"; then
-  success "MySQL root account configured with empty password"
+if run_quiet sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY ''; FLUSH PRIVILEGES;"; then
+  success "MariaDB root account configured with empty password"
 else
-  warn "Could not update the MySQL root user."
+  warn "Could not update the MariaDB root user."
 fi
 
 if command -v composer >/dev/null 2>&1; then
@@ -54,7 +54,7 @@ add_line_if_missing "export PATH=\"\$HOME/.bun/bin:\$PATH\"" "$TARGET_HOME/.bash
 export PATH="$HOME/.config/composer/vendor/bin:$HOME/.bun/bin:$PATH"
 success "Shell PATH updated for Composer and Bun"
 
-apt_install network-manager libnss3-tools jq xsel
+dnf_install NetworkManager nss-tools jq xsel
 
 if run_quiet composer global require cpriego/valet-linux; then
   success "valet-linux installed"
