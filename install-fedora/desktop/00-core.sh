@@ -16,7 +16,7 @@ dnf_install gnome-tweaks flameshot
 dnf_install_optional timeshift
 
 dnf_install samba samba-client
-run_quiet sudo groupadd -r sambashare || true
+getent group sambashare >/dev/null 2>&1 || run_quiet sudo groupadd -r sambashare
 run_quiet sudo usermod -aG sambashare "$TARGET_USER"
 success "User added to sambashare: $TARGET_USER"
 sudo mkdir -p /var/lib/samba/usershares
