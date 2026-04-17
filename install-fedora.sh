@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_ROOT="$ROOT_DIR/install"
+INSTALL_ROOT="$ROOT_DIR/install-fedora"
 SELECTED_THEME=""
 export SELECTED_THEME
 

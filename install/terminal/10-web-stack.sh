@@ -56,25 +56,6 @@ success "Shell PATH updated for Composer and Bun"
 
 apt_install network-manager libnss3-tools jq xsel
 
-if run_quiet composer global require cpriego/valet-linux; then
-  success "valet-linux installed"
-else
-  warn "Could not install valet-linux."
-fi
-
-if command -v valet >/dev/null 2>&1; then
-  run_quiet valet install
-  success "valet install completed"
-else
-  warn "valet command not found, skipping valet install."
-fi
-
-mkdir -p "$TARGET_HOME/sites"
-if command -v valet >/dev/null 2>&1; then
-  run_quiet valet park "$TARGET_HOME/sites"
-  success "valet park completed in ~/sites"
-fi
-
 add_line_if_missing 'alias copy="xsel -b"' "$TARGET_HOME/.bashrc"
 add_line_if_missing 'alias paste="xsel -b -o"' "$TARGET_HOME/.bashrc"
 success "Clipboard aliases configured: copy, paste"
