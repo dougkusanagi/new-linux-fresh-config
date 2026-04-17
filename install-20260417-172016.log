@@ -1,0 +1,26 @@
+[2026-04-17 17:20:16] [INFO] Installation started - fedora
+[2026-04-17 17:20:16] [INFO] Selected installer family: fedora
+[2026-04-17 17:20:16] [INFO] [DRY-RUN] Would disable GNOME auto-lock and suspend
+[2026-04-17 17:20:16] [INFO] Installing terminal and desktop tools...
+[2026-04-17 17:20:16] [INFO] [DRY-RUN] Would update package index
+[2026-04-17 17:20:16] [INFO] bat is already installed.
+[2026-04-17 17:20:16] [INFO] bottom is already installed.
+[2026-04-17 17:20:16] [INFO] fd-find is already installed.
+[2026-04-17 17:20:16] [INFO] git is already installed.
+[2026-04-17 17:20:16] [INFO] curl is already installed.
+[2026-04-17 17:20:16] [INFO] wget is already installed.
+[2026-04-17 17:20:16] [INFO] gnupg2 is already installed.
+[2026-04-17 17:20:16] [INFO] ca-certificates is already installed.
+[2026-04-17 17:20:16] [INFO] ripgrep is already installed.
+[2026-04-17 17:20:16] [INFO] tealdeer is already installed.
+[2026-04-17 17:20:16] [INFO] jq is already installed.
+[2026-04-17 17:20:16] [INFO] xsel is already installed.
+[2026-04-17 17:20:16] [INFO] unzip is already installed.
+[2026-04-17 17:20:16] [INFO] dnf-plugins-core is already installed.
+[2026-04-17 17:20:16] [INFO] gh is already installed.
+[2026-04-17 17:20:16] [INFO] Installing eza...
+[2026-04-17 17:20:16] [INFO] eza is already installed.
+[2026-04-17 17:20:16] [OK] Shell aliases configured: ls, bottom
+[2026-04-17 17:20:16] [INFO] sd is already available.
+[2026-04-17 17:20:16] [INFO] dust is already available.
+[2026-04-17 17:20:16] [INFO] podman is already installed.

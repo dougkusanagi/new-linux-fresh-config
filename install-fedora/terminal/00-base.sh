@@ -38,11 +38,15 @@ install_sd
 install_dust
 
 dnf_install podman
-sudo mkdir -p /etc/containers/registries.conf.d
-sudo tee /etc/containers/registries.conf.d/00-shortnames.conf > /dev/null <<'EOF'
+if [[ "$DRY_RUN" == "true" ]]; then
+  log "[DRY-RUN] Would configure podman registries"
+else
+  sudo mkdir -p /etc/containers/registries.conf.d
+  sudo tee /etc/containers/registries.conf.d/00-shortnames.conf > /dev/null <<'EOF'
 unqualified-search-registries = ["docker.io", "quay.io"]
 short-name-mode = "permissive"
 EOF
+fi
 success "Podman short-name registries configured"
 
 if command -v bun >/dev/null 2>&1; then

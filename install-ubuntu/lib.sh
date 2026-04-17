@@ -3,8 +3,17 @@
 RUNNING_GNOME="false"
 GNOME_SETTINGS_CHANGED="false"
 REQUIRES_REBOOT="false"
+DRY_RUN="${DRY_RUN:-false}"
 TARGET_USER="${USER}"
 TARGET_HOME="${HOME}"
+
+runUnlessDry() {
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would run: $*"
+    return
+  fi
+  "$@"
+}
 export TARGET_USER TARGET_HOME
 OMAKUB_THEME_REPO="https://raw.githubusercontent.com/basecamp/omakub/master"
 SUPPORTED_THEMES=(
@@ -44,18 +53,30 @@ section() {
 
 log() {
   printf "%s->%s %s\n" "${COLOR_DIM}" "${COLOR_RESET}" "$*"
+  log_to_file "INFO" "$*"
 }
 
 success() {
   printf "%sOK%s %s\n" "${COLOR_GREEN}" "${COLOR_RESET}" "$*"
+  log_to_file "OK" "$*"
 }
 
 warn() {
   printf "%sWARN%s %s\n" "${COLOR_YELLOW}" "${COLOR_RESET}" "$*" >&2
+  log_to_file "WARN" "$*"
 }
 
 error() {
   printf "%sERROR%s %s\n" "${COLOR_RED}" "${COLOR_RESET}" "$*" >&2
+  log_to_file "ERROR" "$*"
+}
+
+log_to_file() {
+  local level="$1"
+  local message="$2"
+  if [[ -n "${INSTALL_LOG:-}" ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" >> "$INSTALL_LOG"
+  fi
 }
 
 join_by() {
@@ -75,6 +96,11 @@ join_by() {
 }
 
 run_quiet() {
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would run: $*"
+    return 0
+  fi
+
   local log_file exit_code
   log_file="$(mktemp)"
 
@@ -92,6 +118,10 @@ run_quiet() {
 }
 
 require_sudo() {
+  if [[ "$DRY_RUN" == "true" ]]; then
+    return
+  fi
+
   if sudo -n true 2>/dev/null; then
     return
   fi
@@ -113,6 +143,10 @@ apt_package_installed() {
 }
 
 apt_update() {
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would update package index"
+    return
+  fi
   run_quiet sudo apt-get update -y
   success "Package index updated"
 }
@@ -132,6 +166,11 @@ apt_install() {
   done
 
   if [[ "${#missing_packages[@]}" -eq 0 ]]; then
+    return
+  fi
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would install: ${missing_packages[*]}"
     return
   fi
 
@@ -178,6 +217,15 @@ add_line_if_missing() {
 flatpak_install_app() {
   local app_id="$1"
 
+  if [[ "$DRY_RUN" == "true" ]]; then
+    if flatpak info "$app_id" >/dev/null 2>&1; then
+      log "[DRY-RUN] Would update flatpak: $app_id"
+    else
+      log "[DRY-RUN] Would install flatpak: $app_id"
+    fi
+    return
+  fi
+
   if flatpak info "$app_id" >/dev/null 2>&1; then
     run_quiet flatpak update -y "$app_id"
     success "Flatpak updated: $app_id"
@@ -212,6 +260,11 @@ detect_desktop() {
 }
 
 configure_gnome_for_install() {
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would disable GNOME auto-lock and suspend"
+    GNOME_SETTINGS_CHANGED="false"
+    return
+  fi
   log "Disabling GNOME auto-lock and suspend while installation runs..."
   gsettings set org.gnome.desktop.screensaver lock-enabled false
   gsettings set org.gnome.desktop.session idle-delay 0

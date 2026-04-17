@@ -1,0 +1,49 @@
+[2026-04-17 17:21:01] [INFO] Installation started - fedora
+[2026-04-17 17:21:01] [INFO] Selected installer family: fedora
+[2026-04-17 17:21:01] [INFO] [DRY-RUN] Would disable GNOME auto-lock and suspend
+[2026-04-17 17:21:01] [INFO] Installing terminal and desktop tools...
+[2026-04-17 17:21:01] [INFO] [DRY-RUN] Would update package index
+[2026-04-17 17:21:01] [INFO] bat is already installed.
+[2026-04-17 17:21:01] [INFO] bottom is already installed.
+[2026-04-17 17:21:01] [INFO] fd-find is already installed.
+[2026-04-17 17:21:01] [INFO] git is already installed.
+[2026-04-17 17:21:01] [INFO] curl is already installed.
+[2026-04-17 17:21:01] [INFO] wget is already installed.
+[2026-04-17 17:21:01] [INFO] gnupg2 is already installed.
+[2026-04-17 17:21:02] [INFO] ca-certificates is already installed.
+[2026-04-17 17:21:02] [INFO] ripgrep is already installed.
+[2026-04-17 17:21:02] [INFO] tealdeer is already installed.
+[2026-04-17 17:21:02] [INFO] jq is already installed.
+[2026-04-17 17:21:02] [INFO] xsel is already installed.
+[2026-04-17 17:21:02] [INFO] unzip is already installed.
+[2026-04-17 17:21:02] [INFO] dnf-plugins-core is already installed.
+[2026-04-17 17:21:02] [INFO] gh is already installed.
+[2026-04-17 17:21:02] [INFO] Installing eza...
+[2026-04-17 17:21:02] [INFO] eza is already installed.
+[2026-04-17 17:21:02] [OK] Shell aliases configured: ls, bottom
+[2026-04-17 17:21:02] [INFO] sd is already available.
+[2026-04-17 17:21:02] [INFO] dust is already available.
+[2026-04-17 17:21:02] [INFO] podman is already installed.
+[2026-04-17 17:21:02] [INFO] [DRY-RUN] Would configure podman registries
+[2026-04-17 17:21:02] [OK] Podman short-name registries configured
+[2026-04-17 17:21:02] [INFO] Bun is already available.
+[2026-04-17 17:21:02] [INFO] uv is already available.
+[2026-04-17 17:21:02] [INFO] warp-terminal is already installed.
+[2026-04-17 17:21:02] [INFO] [DRY-RUN] Would update package index
+[2026-04-17 17:21:02] [INFO] php is already installed.
+[2026-04-17 17:21:02] [INFO] php-cli is already installed.
+[2026-04-17 17:21:02] [INFO] php-fpm is already installed.
+[2026-04-17 17:21:02] [INFO] php-common is already installed.
+[2026-04-17 17:21:02] [INFO] php-mbstring is already installed.
+[2026-04-17 17:21:02] [INFO] php-xml is already installed.
+[2026-04-17 17:21:02] [INFO] php-curl is already installed.
+[2026-04-17 17:21:02] [INFO] php-gd is already installed.
+[2026-04-17 17:21:02] [INFO] php-pecl-imagick is already installed.
+[2026-04-17 17:21:02] [INFO] php-pecl-zip is already installed.
+[2026-04-17 17:21:02] [INFO] php-bcmath is already installed.
+[2026-04-17 17:21:02] [INFO] php-intl is already installed.
+[2026-04-17 17:21:02] [INFO] php-mysqlnd is already installed.
+[2026-04-17 17:21:02] [INFO] php-pgsql is already installed.
+[2026-04-17 17:21:02] [INFO] php-pdo is already installed.
+[2026-04-17 17:21:02] [INFO] php-pecl-redis5 is already installed.
+[2026-04-17 17:21:02] [INFO] php-opcache is already installed.

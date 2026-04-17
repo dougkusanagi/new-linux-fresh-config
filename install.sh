@@ -4,6 +4,7 @@ set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REQUESTED_DISTRO="auto"
+DRY_RUN="false"
 INSTALL_FAMILY=""
 INSTALL_ROOT=""
 SELECTED_THEME=""
@@ -17,6 +18,9 @@ Usage:
 Options:
   --distro=NAME
       Select installer family. Default: auto.
+
+  --dry-run
+      Show what would be installed without making any changes.
 
   --theme=NAME
       Apply one of the Omakub-inspired themes after desktop installation.
@@ -39,6 +43,9 @@ preparse_args() {
       --distro=*)
         REQUESTED_DISTRO="$(normalize_local_name "${arg#*=}")"
         ;;
+      --dry-run)
+        DRY_RUN="true"
+        ;;
       --help)
         usage
         exit 0
@@ -55,7 +62,7 @@ detect_install_family() {
       ;;
     ubuntu)
       INSTALL_FAMILY="ubuntu"
-      INSTALL_ROOT="$ROOT_DIR/install"
+      INSTALL_ROOT="$ROOT_DIR/install-ubuntu"
       return
       ;;
     fedora|nobara)
@@ -82,7 +89,7 @@ detect_install_family() {
   case "${ID:-}" in
     ubuntu)
       INSTALL_FAMILY="ubuntu"
-      INSTALL_ROOT="$ROOT_DIR/install"
+      INSTALL_ROOT="$ROOT_DIR/install-ubuntu"
       ;;
     fedora|nobara)
       INSTALL_FAMILY="fedora"
@@ -91,7 +98,7 @@ detect_install_family() {
     *)
       if [[ " ${ID_LIKE:-} " == *" debian "* ]]; then
         INSTALL_FAMILY="ubuntu"
-        INSTALL_ROOT="$ROOT_DIR/install"
+        INSTALL_ROOT="$ROOT_DIR/install-ubuntu"
       elif [[ " ${ID_LIKE:-} " == *" fedora "* ]]; then
         INSTALL_FAMILY="fedora"
         INSTALL_ROOT="$ROOT_DIR/install-fedora"
@@ -108,6 +115,8 @@ parse_args() {
   for arg in "$@"; do
     case "$arg" in
       --distro=*)
+        ;;
+      --dry-run)
         ;;
       --theme=*)
         SELECTED_THEME="$(normalize_theme_name "${arg#*=}")"
@@ -135,6 +144,16 @@ trap 'echo "A instalacao falhou. Voce pode tentar novamente com: ./install.sh"' 
 preparse_args "$@"
 detect_install_family "$REQUESTED_DISTRO"
 
+log_to_file() {
+  local level="$1"
+  local message="$2"
+  if [[ -n "${INSTALL_LOG:-}" ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" >> "$INSTALL_LOG"
+  fi
+}
+
+export DRY_RUN
+
 # shellcheck source=/dev/null
 source "$INSTALL_ROOT/lib.sh"
 
@@ -147,6 +166,15 @@ main() {
     error "Execute este script com seu usuario normal, sem sudo."
     exit 1
   fi
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    echo "Running in DRY-RUN mode - no changes will be made"
+    echo
+  fi
+
+  export INSTALL_LOG="$ROOT_DIR/install-$(date +%Y%m%d-%H%M%S).log"
+  echo "Logging to: $INSTALL_LOG"
+  log_to_file "INFO" "Installation started - $INSTALL_FAMILY"
 
   echo "This is a very opinionated basic dev environment with PHP, Composer, Node and many desktop apps"
   log "Selected installer family: $INSTALL_FAMILY"
