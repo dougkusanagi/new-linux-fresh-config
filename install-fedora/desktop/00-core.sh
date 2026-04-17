@@ -3,7 +3,7 @@
 section "Desktop Core"
 
 dnf_update
-dnf_install fuse || warn "fuse is not available on this distribution."
+dnf_install_optional fuse
 
 dnf_install flatpak
 run_quiet sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
@@ -12,7 +12,8 @@ if flatpak remotes --user | grep -q "^flathub"; then
 fi
 success "Flathub configured"
 
-dnf_install gnome-tweaks timeshift flameshot
+dnf_install gnome-tweaks flameshot
+dnf_install_optional timeshift
 
 dnf_install samba samba-client
 run_quiet sudo groupadd -r sambashare || true

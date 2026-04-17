@@ -81,9 +81,10 @@ run_quiet() {
   if "$@" >"$log_file" 2>&1; then
     rm -f "$log_file"
     return 0
+  else
+    exit_code=$?
   fi
 
-  exit_code=$?
   error "Command failed: $*"
   sed -n '1,120p' "$log_file" >&2 || true
   rm -f "$log_file"

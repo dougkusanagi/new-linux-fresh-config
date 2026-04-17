@@ -3,16 +3,21 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_ROOT="$ROOT_DIR/install"
+REQUESTED_DISTRO="auto"
+INSTALL_FAMILY=""
+INSTALL_ROOT=""
 SELECTED_THEME=""
 export SELECTED_THEME
 
 usage() {
   cat <<'EOF'
 Usage:
-  ./install.sh [--theme=NAME] [--list-themes] [--help]
+  ./install.sh [--distro=auto|ubuntu|fedora|nobara] [--theme=NAME] [--list-themes] [--help]
 
 Options:
+  --distro=NAME
+      Select installer family. Default: auto.
+
   --theme=NAME
       Apply one of the Omakub-inspired themes after desktop installation.
 
@@ -24,9 +29,86 @@ Options:
 EOF
 }
 
+normalize_local_name() {
+  echo "$1" | tr '[:upper:]' '[:lower:]' | tr ' ' '-'
+}
+
+preparse_args() {
+  for arg in "$@"; do
+    case "$arg" in
+      --distro=*)
+        REQUESTED_DISTRO="$(normalize_local_name "${arg#*=}")"
+        ;;
+      --help)
+        usage
+        exit 0
+        ;;
+    esac
+  done
+}
+
+detect_install_family() {
+  local requested="$1"
+
+  case "$requested" in
+    auto)
+      ;;
+    ubuntu)
+      INSTALL_FAMILY="ubuntu"
+      INSTALL_ROOT="$ROOT_DIR/install"
+      return
+      ;;
+    fedora|nobara)
+      INSTALL_FAMILY="fedora"
+      INSTALL_ROOT="$ROOT_DIR/install-fedora"
+      return
+      ;;
+    *)
+      echo "Unsupported distro: $requested" >&2
+      echo "Supported values: auto, ubuntu, fedora, nobara" >&2
+      exit 1
+      ;;
+  esac
+
+  if [[ ! -r /etc/os-release ]]; then
+    echo "Could not detect distro because /etc/os-release is not readable." >&2
+    echo "Retry with --distro=ubuntu, --distro=fedora, or --distro=nobara." >&2
+    exit 1
+  fi
+
+  # shellcheck source=/dev/null
+  source /etc/os-release
+
+  case "${ID:-}" in
+    ubuntu)
+      INSTALL_FAMILY="ubuntu"
+      INSTALL_ROOT="$ROOT_DIR/install"
+      ;;
+    fedora|nobara)
+      INSTALL_FAMILY="fedora"
+      INSTALL_ROOT="$ROOT_DIR/install-fedora"
+      ;;
+    *)
+      if [[ " ${ID_LIKE:-} " == *" debian "* ]]; then
+        INSTALL_FAMILY="ubuntu"
+        INSTALL_ROOT="$ROOT_DIR/install"
+      elif [[ " ${ID_LIKE:-} " == *" fedora "* ]]; then
+        INSTALL_FAMILY="fedora"
+        INSTALL_ROOT="$ROOT_DIR/install-fedora"
+      else
+        echo "Unsupported distro: ${PRETTY_NAME:-${ID:-unknown}}" >&2
+        echo "Retry with --distro=ubuntu, --distro=fedora, or --distro=nobara if you know it is compatible." >&2
+        exit 1
+      fi
+      ;;
+  esac
+}
+
 parse_args() {
   for arg in "$@"; do
     case "$arg" in
+      --distro=*)
+        ;;
       --theme=*)
         SELECTED_THEME="$(normalize_theme_name "${arg#*=}")"
         ;;
@@ -50,6 +132,9 @@ parse_args() {
 
 trap 'echo "A instalacao falhou. Voce pode tentar novamente com: ./install.sh"' ERR
 
+preparse_args "$@"
+detect_install_family "$REQUESTED_DISTRO"
+
 # shellcheck source=/dev/null
 source "$INSTALL_ROOT/lib.sh"
 
@@ -64,6 +149,7 @@ main() {
   fi
 
   echo "This is a very opinionated basic dev environment with PHP, Composer, Node and many desktop apps"
+  log "Selected installer family: $INSTALL_FAMILY"
   echo
   echo "Begin installation (or abort with ctrl+c)..."
 

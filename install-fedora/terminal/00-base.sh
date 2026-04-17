@@ -58,3 +58,18 @@ else
   run_quiet sh -lc 'curl -LsSf https://astral.sh/uv/install.sh | sh'
   success "uv installed"
 fi
+
+section "Warp Terminal"
+if [[ ! -f /etc/yum.repos.d/warpdotdev.repo ]]; then
+  log "Adding Warp repository..."
+  sudo tee /etc/yum.repos.d/warpdotdev.repo > /dev/null <<'EOF'
+[warpdotdev]
+name=Warp Repository
+baseurl=https://releases.warp.dev/linux/rpm/stable
+enabled=1
+gpgcheck=1
+gpgkey=https://releases.warp.dev/linux/keys/warp.asc
+EOF
+  sudo dnf makecache
+fi
+dnf_install warp-terminal

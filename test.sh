@@ -2,9 +2,14 @@
 
 set -Eeuo pipefail
 
-MODE="multipass"
-SCRIPT_NAME="install.sh"
-CONTAINER_IMAGE="ubuntu:24.04"
+MODE="container"
+DISTRO="ubuntu"
+DISTRO_EXPLICIT="false"
+SCRIPT_NAME=""
+SCRIPT_EXPLICIT="false"
+INSTALL_DIR=""
+CONTAINER_IMAGE=""
+CONTAINER_IMAGE_EXPLICIT="false"
 CONTAINER_NAME="setup-script-test"
 VM_NAME="fresh-config-test"
 VM_RELEASE="24.04"
@@ -13,6 +18,7 @@ VM_MEMORY="4G"
 VM_DISK="30G"
 VM_WORKDIR="/home/ubuntu/workspace"
 KEEP_VM="false"
+RUN_INSTALLER="false"
 MULTIPASS_CERT_PATH="/var/snap/multipass/common/data/multipassd/multipass_root_cert.pem"
 
 if [[ -t 1 ]]; then
@@ -60,11 +66,12 @@ run_quiet() {
   if "$@" >"$log_file" 2>&1; then
     rm -f "$log_file"
     return 0
+  else
+    exit_code=$?
   fi
 
-  exit_code=$?
   error "Command failed: $*"
-  sed -n '1,120p' "$log_file" >&2 || true
+  sed -n '1,160p' "$log_file" >&2 || true
   rm -f "$log_file"
   return "$exit_code"
 }
@@ -75,45 +82,77 @@ Usage:
   ./test.sh [options]
 
 Options:
+  --distro=ubuntu|fedora|nobara
+      Select the target distro. Default: detected from the host.
+
   --mode=multipass
-      Default. Installs Multipass if needed, creates a clean Ubuntu VM,
-      mounts the repo, and runs the installer there.
+      Creates a clean Ubuntu VM via Multipass and runs the installer.
+      This mode only supports --distro=ubuntu and requires Multipass.
 
   --mode=container
-      Runs a fast smoke test in a container. Useful for quick checks,
-      but it does not validate GNOME, Nautilus Share, themes, or reboot flows.
+      Default. Runs a fast smoke test in a container. For Nobara, this uses
+      a Fedora container as an approximation and does not validate Nobara
+      desktop customizations.
+
+  --mode=static
+      Runs local shell syntax and --list-themes checks only.
+
+  --syntax-only
+      Validate shell syntax and --list-themes without executing the installer.
+      This is the default for container mode.
+
+  --run-installer
+      Execute the installer after bootstrap checks. This is slow in containers
+      and mainly useful for dedicated throwaway environments.
 
   --keep-vm
       Keeps the Multipass VM after the test.
 
   --name=NAME
-      VM or container instance name. Default: fresh-config-test
+      VM or container instance name. Default: fresh-config-test.
 
   --release=VERSION
-      Ubuntu release for Multipass. Default: 24.04
+      Ubuntu release for Multipass. Default: 24.04.
 
   --cpus=N
-      VM CPU count. Default: 2
+      VM CPU count. Default: 2.
 
   --memory=SIZE
-      VM memory. Default: 4G
+      VM memory. Default: 4G.
 
   --disk=SIZE
-      VM disk. Default: 30G
+      VM disk. Default: 30G.
+
+  --image=IMAGE
+      Container image override.
 
   --script=FILE
-      Script to run inside the guest/container. Default: install.sh
+      Installer script override. Normally inferred from --distro.
 
   --help
       Show this help.
 EOF
 }
 
+normalize_name() {
+  echo "$1" | tr '[:upper:]' '[:lower:]' | tr ' ' '-'
+}
+
 parse_args() {
   for arg in "$@"; do
     case "$arg" in
+      --distro=*)
+        DISTRO="$(normalize_name "${arg#*=}")"
+        DISTRO_EXPLICIT="true"
+        ;;
       --mode=*)
         MODE="${arg#*=}"
+        ;;
+      --syntax-only)
+        RUN_INSTALLER="false"
+        ;;
+      --run-installer)
+        RUN_INSTALLER="true"
         ;;
       --keep-vm)
         KEEP_VM="true"
@@ -134,8 +173,13 @@ parse_args() {
       --disk=*)
         VM_DISK="${arg#*=}"
         ;;
+      --image=*)
+        CONTAINER_IMAGE="${arg#*=}"
+        CONTAINER_IMAGE_EXPLICIT="true"
+        ;;
       --script=*)
         SCRIPT_NAME="${arg#*=}"
+        SCRIPT_EXPLICIT="true"
         ;;
       --help)
         usage
@@ -151,15 +195,176 @@ parse_args() {
   done
 }
 
+configure_target() {
+  if [[ "$DISTRO_EXPLICIT" == "false" ]]; then
+    DISTRO="$(detect_host_distro)"
+  fi
+
+  case "$DISTRO" in
+    ubuntu)
+      INSTALL_DIR="install"
+      if [[ "$SCRIPT_EXPLICIT" == "false" ]]; then
+        SCRIPT_NAME="install.sh"
+      fi
+      if [[ "$CONTAINER_IMAGE_EXPLICIT" == "false" ]]; then
+        CONTAINER_IMAGE="ubuntu:24.04"
+      fi
+      ;;
+    fedora)
+      INSTALL_DIR="install-fedora"
+      if [[ "$SCRIPT_EXPLICIT" == "false" ]]; then
+        SCRIPT_NAME="install-fedora.sh"
+      fi
+      if [[ "$CONTAINER_IMAGE_EXPLICIT" == "false" ]]; then
+        CONTAINER_IMAGE="fedora:latest"
+      fi
+      ;;
+    nobara)
+      INSTALL_DIR="install-fedora"
+      if [[ "$SCRIPT_EXPLICIT" == "false" ]]; then
+        SCRIPT_NAME="install-fedora.sh"
+      fi
+      if [[ "$CONTAINER_IMAGE_EXPLICIT" == "false" ]]; then
+        CONTAINER_IMAGE="fedora:latest"
+      fi
+      ;;
+    *)
+      error "Unsupported distro: $DISTRO"
+      warn "Supported distros: ubuntu, fedora, nobara"
+      exit 1
+      ;;
+  esac
+
+  if [[ "$MODE" == "multipass" && "$DISTRO" != "ubuntu" ]]; then
+    error "Multipass mode only supports --distro=ubuntu."
+    warn "Use './test.sh --distro=$DISTRO --mode=container' for a CLI smoke test."
+    warn "Use a real Nobara/Fedora desktop VM for GNOME, Samba, fonts, Flatpak, and theme validation."
+    exit 1
+  fi
+}
+
+print_multipass_unavailable_help() {
+  local suggested_distro
+  suggested_distro="$(detect_host_distro)"
+
+  error "Multipass is not installed and snap is not available to install it."
+  warn "On Fedora/Nobara hosts, run the container smoke test instead:"
+  warn "  ./test.sh --distro=$suggested_distro --mode=container"
+  warn "For local syntax checks without containers:"
+  warn "  ./test.sh --distro=$suggested_distro --mode=static"
+  warn "For full desktop validation, use a real Ubuntu/Nobara desktop VM and follow test-vm.md."
+}
+
 command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
-require_script() {
+detect_host_distro() {
+  if [[ ! -r /etc/os-release ]]; then
+    echo "$DISTRO"
+    return
+  fi
+
+  local host_id="" host_like=""
+  while IFS='=' read -r key value; do
+    value="${value%\"}"
+    value="${value#\"}"
+    case "$key" in
+      ID)
+        host_id="$value"
+        ;;
+      ID_LIKE)
+        host_like="$value"
+        ;;
+    esac
+  done < /etc/os-release
+
+  case "$host_id" in
+    ubuntu|fedora|nobara)
+      echo "$host_id"
+      ;;
+    *)
+      if [[ " $host_like " == *" fedora "* ]]; then
+        echo "fedora"
+      elif [[ " $host_like " == *" debian "* ]]; then
+        echo "ubuntu"
+      else
+        echo "$DISTRO"
+      fi
+      ;;
+  esac
+}
+
+require_paths() {
   [[ -f "$SCRIPT_NAME" ]] || {
     error "File '$SCRIPT_NAME' was not found in $(pwd)."
     exit 1
   }
+
+  [[ -d "$INSTALL_DIR" ]] || {
+    error "Directory '$INSTALL_DIR' was not found in $(pwd)."
+    exit 1
+  }
+}
+
+syntax_files() {
+  printf "%s\n" \
+    "$SCRIPT_NAME" \
+    "$INSTALL_DIR/lib.sh" \
+    "$INSTALL_DIR/terminal.sh" \
+    "$INSTALL_DIR/desktop.sh" \
+    "$INSTALL_DIR"/terminal/*.sh \
+    "$INSTALL_DIR"/desktop/*.sh
+}
+
+syntax_files_inline() {
+  syntax_files | tr '\n' ' '
+}
+
+bootstrap_command() {
+  case "$DISTRO" in
+    ubuntu)
+      cat <<'EOF'
+export DEBIAN_FRONTEND=noninteractive
+sudo apt-get update
+sudo apt-get install -y bash ca-certificates curl git jq sudo wget software-properties-common xsel unzip fontconfig
+EOF
+      ;;
+    fedora|nobara)
+      cat <<'EOF'
+sudo dnf makecache -y
+sudo dnf install -y bash ca-certificates curl git jq sudo wget xsel unzip fontconfig findutils
+EOF
+      ;;
+  esac
+}
+
+container_bootstrap_command() {
+  case "$DISTRO" in
+    ubuntu)
+      cat <<'EOF'
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y bash ca-certificates curl git jq sudo wget software-properties-common xsel unzip fontconfig
+if ! id testuser >/dev/null 2>&1; then
+  useradd -m -s /bin/bash testuser
+fi
+echo 'testuser ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/testuser
+chmod 0440 /etc/sudoers.d/testuser
+EOF
+      ;;
+    fedora|nobara)
+      cat <<'EOF'
+dnf makecache -y
+dnf install -y bash ca-certificates curl git jq sudo wget xsel unzip fontconfig findutils
+if ! id testuser >/dev/null 2>&1; then
+  useradd -m -s /bin/bash testuser
+fi
+echo 'testuser ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/testuser
+chmod 0440 /etc/sudoers.d/testuser
+EOF
+      ;;
+  esac
 }
 
 check_multipass_host_prereqs() {
@@ -203,7 +408,7 @@ ensure_multipass() {
   fi
 
   if ! command_exists snap; then
-    error "Multipass is not installed and snap is not available to install it."
+    print_multipass_unavailable_help
     exit 1
   fi
 
@@ -292,18 +497,35 @@ vm_cleanup() {
 cleanup() {
   if [[ "$MODE" == "container" ]]; then
     container_cleanup
-  else
+  elif [[ "$MODE" == "multipass" ]]; then
     vm_cleanup
   fi
+}
+
+run_local_static_checks() {
+  section "Local Static Checks"
+  log "Validating shell syntax for $SCRIPT_NAME and $INSTALL_DIR..."
+  run_quiet bash -n $(syntax_files)
+  success "Shell syntax validated"
+
+  log "Validating theme list..."
+  run_quiet "./$SCRIPT_NAME" --list-themes
+  success "Theme list validated"
 }
 
 run_container_test() {
   section "Container Test"
   detect_container_engine
 
+  log "Target distro: $DISTRO"
+  log "Using installer: $SCRIPT_NAME ($INSTALL_DIR)"
   log "Using container engine: $CONTAINER_ENGINE"
   log "Using image: $CONTAINER_IMAGE"
-  warn "Container mode is a smoke test only. It does not validate GNOME, Nautilus Share, themes, or reboot."
+  warn "Container mode is a CLI smoke test only. It does not validate GNOME, Nautilus Share, themes, or reboot."
+
+  if [[ "$DISTRO" == "nobara" ]]; then
+    warn "Nobara is tested with a Fedora container approximation. Validate the desktop flow in a real Nobara VM."
+  fi
 
   container_cleanup
 
@@ -313,21 +535,23 @@ run_container_test() {
     "$CONTAINER_IMAGE" \
     bash -lc "
       set -Eeuo pipefail
-      export DEBIAN_FRONTEND=noninteractive
 
-      apt-get update
-      apt-get install -y bash ca-certificates curl git jq sudo wget software-properties-common xsel unzip fontconfig
+      $(container_bootstrap_command)
 
       echo '[INFO] Validating shell syntax...'
-      bash -n '$SCRIPT_NAME' install/lib.sh install/terminal.sh install/desktop.sh install/terminal/*.sh install/desktop/*.sh
+      bash -n $(syntax_files_inline)
 
       echo '[INFO] Validating theme list...'
-      ./'$SCRIPT_NAME' --list-themes >/dev/null
+      sudo -u testuser env HOME=/home/testuser ./'$SCRIPT_NAME' --list-themes >/dev/null
 
-      echo '[INFO] Executing installer inside the container...'
-      chmod +x '$SCRIPT_NAME'
-      ./'$SCRIPT_NAME'
-    "
+      if [[ '$RUN_INSTALLER' == 'true' ]]; then
+        echo '[INFO] Executing installer inside the container...'
+        chmod +x '$SCRIPT_NAME'
+        sudo -u testuser env HOME=/home/testuser ./'$SCRIPT_NAME'
+      else
+        echo '[INFO] Skipping installer execution because --syntax-only was used.'
+      fi
+    " || return $?
   success "Container smoke test completed"
 }
 
@@ -372,12 +596,8 @@ run_vm_test() {
   section "VM Bootstrap"
   run_quiet multipass exec "$VM_NAME" -- bash -lc "
     set -Eeuo pipefail
-    export DEBIAN_FRONTEND=noninteractive
-
     cd '$VM_WORKDIR'
-
-    sudo apt-get update
-    sudo apt-get install -y bash ca-certificates curl git jq sudo wget software-properties-common xsel unzip fontconfig
+    $(bootstrap_command)
   "
   success "Bootstrap packages ready in VM"
 
@@ -385,7 +605,7 @@ run_vm_test() {
   run_quiet multipass exec "$VM_NAME" -- bash -lc "
     set -Eeuo pipefail
     cd '$VM_WORKDIR'
-    bash -n '$SCRIPT_NAME' install/lib.sh install/terminal.sh install/desktop.sh install/terminal/*.sh install/desktop/*.sh
+    bash -n $(syntax_files_inline)
   "
   success "Installer syntax validated"
 
@@ -397,22 +617,31 @@ run_vm_test() {
   "
   success "Theme list validated"
 
+  if [[ "$RUN_INSTALLER" == "false" ]]; then
+    warn "Skipping installer execution because --syntax-only was used."
+    return
+  fi
+
   section "Installer"
   multipass exec "$VM_NAME" -- bash -lc "
     set -Eeuo pipefail
     cd '$VM_WORKDIR'
     chmod +x '$SCRIPT_NAME'
-    ./'$SCRIPT_NAME'
-  "
+    ./'$SCRIPT_NAME' --distro=ubuntu
+  " || return $?
   success "Installer completed in VM"
 }
 
 main() {
   parse_args "$@"
-  require_script
+  configure_target
+  require_paths
   trap cleanup EXIT
 
   case "$MODE" in
+    static)
+      run_local_static_checks
+      ;;
     multipass)
       run_vm_test
       ;;

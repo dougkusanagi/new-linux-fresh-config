@@ -70,3 +70,14 @@ else
   run_quiet sh -lc 'curl -LsSf https://astral.sh/uv/install.sh | sh'
   success "uv installed"
 fi
+
+section "Warp Terminal"
+if ! grep -q "warpdotdev" /etc/apt/sources.list.d/*.list 2>/dev/null; then
+  log "Adding Warp repository..."
+  wget -qO- https://releases.warp.dev/linux/keys/warp.asc | sudo gpg --dearmor -o /etc/apt/keyrings/warpdotdev.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/warpdotdev.gpg] https://releases.warp.dev/linux/deb stable main" \
+    | sudo tee /etc/apt/sources.list.d/warpdotdev.list > /dev/null
+  sudo chmod 644 /etc/apt/keyrings/warpdotdev.gpg /etc/apt/sources.list.d/warpdotdev.list
+  apt_update
+fi
+apt_install warp-terminal

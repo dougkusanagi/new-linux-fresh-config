@@ -2,127 +2,203 @@
 
 ## Resumo
 
-Este projeto agora tem dois jeitos de testar:
+Este projeto suporta dois fluxos de instalacao:
 
-1. `./test.sh`
-   Cria uma VM limpa Ubuntu via Multipass e roda um smoke test automatizado do fluxo CLI.
+1. Ubuntu, via `./install.sh` ou `./install.sh --distro=ubuntu`.
+2. Fedora/Nobara, via `./install.sh --distro=fedora`, `./install.sh --distro=nobara`, ou `./install-fedora.sh`.
 
-2. VM Desktop manual
-   Valida o que realmente importa para este repositório: GNOME, `gsettings`, `flatpak`, `nautilus-share`, `samba`, fontes, temas e reboot.
+O `./install.sh` detecta a distro por `/etc/os-release` e escolhe o conjunto correto de scripts. O `./install-fedora.sh` continua existindo como atalho direto para Fedora/Nobara.
 
-O teste manual em Ubuntu Desktop continua sendo o mais importante. O teste via Multipass não cobre interface gráfica.
+## Teste Automatizado
 
-## Recomendação Principal
+O script [`test.sh`](/home/silver/dev/new-linux-fresh-config/test.sh) aceita `--distro=ubuntu|fedora|nobara`.
 
-Use `virt-manager` com uma VM de `Ubuntu 24.04 Desktop`.
-
-Configuração sugerida:
-
-- `2 vCPU`
-- `4 GB RAM` no mínimo
-- `30 GB` de disco
-- snapshot logo após a instalação limpa do Ubuntu
-
-Se quiser algo mais simples, `GNOME Boxes` também serve. Mas `virt-manager` é melhor para snapshot, inspeção e repetição de testes.
-
-## Teste Automatizado Com VM Limpa
-
-O script [`test.sh`](/home/silver/dev/new-linux-fresh-config/test.sh) usa `Multipass` por padrão.
-
-Ele faz isto:
-
-- instala `multipass` via `snap` se necessário
-- cria uma VM Ubuntu limpa
-- monta este repositório dentro da VM
-- valida sintaxe dos scripts
-- valida `./install.sh --list-themes`
-- executa `./install.sh`
-
-Uso básico:
+Por padrao, `./test.sh` detecta a distro do host, usa container e nao executa a instalacao completa:
 
 ```bash
 ./test.sh
 ```
 
+Executar tambem o instalador dentro do container:
+
+```bash
+./test.sh --run-installer
+```
+
+Ubuntu em VM limpa via Multipass:
+
+```bash
+./test.sh --distro=ubuntu --mode=multipass
+```
+
+Fedora em container:
+
+```bash
+./test.sh --distro=fedora --mode=container
+```
+
+Nobara em container aproximado:
+
+```bash
+./test.sh --distro=nobara --mode=container
+```
+
+O modo Nobara usa uma imagem Fedora por aproximacao. Ele valida o caminho CLI dos scripts Fedora/Nobara, mas nao substitui uma VM Nobara Desktop.
+
+Validar sintaxe e lista de temas sem executar a instalacao:
+
+```bash
+./test.sh --distro=ubuntu --mode=static
+./test.sh --distro=fedora --mode=static
+./test.sh --distro=nobara --mode=static
+```
+
+Validar o bootstrap de container sem executar a instalacao, equivalente ao default:
+
+```bash
+./test.sh --distro=ubuntu --mode=container --syntax-only
+./test.sh --distro=fedora --mode=container --syntax-only
+./test.sh --distro=nobara --mode=container --syntax-only
+```
+
+Escolher release e tamanho da VM Ubuntu:
+
+```bash
+./test.sh --distro=ubuntu --mode=multipass --release=24.04 --cpus=2 --memory=4G --disk=30G
+```
+
 Manter a VM depois do teste:
 
 ```bash
-./test.sh --keep-vm
+./test.sh --distro=ubuntu --mode=multipass --keep-vm
 ```
 
-Escolher release e tamanho da VM:
+## Limites Dos Testes Automatizados
 
-```bash
-./test.sh --release=24.04 --cpus=2 --memory=4G --disk=30G
-```
-
-Smoke test em container:
-
-```bash
-./test.sh --mode=container
-```
-
-## Limitações Do Teste Automatizado
-
-O modo Multipass valida bem:
+O modo Multipass cobre apenas Ubuntu porque Multipass trabalha com imagens Ubuntu. Ele valida:
 
 - Ubuntu limpo
 - `sudo`
 - `apt`
-- instalação das ferramentas CLI
+- instalacao das ferramentas CLI
 - fluxo real do `install.sh` fora de container
 
-Ele não valida:
+O modo container valida:
+
+- sintaxe dos scripts da distro selecionada
+- `--list-themes`
+- bootstrap minimo de pacotes
+- caminho CLI do instalador
+
+Ele nao valida:
 
 - GNOME
 - `gsettings`
-- `flameshot` shortcut
-- `nautilus-share`
-- `samba` integrado ao desktop
-- fontes aplicadas visualmente
-- temas do Omakub no GNOME
-- reboot pós-instalação
+- atalho do `flameshot`
+- integracao visual de fontes
+- temas do Omakub aplicados no GNOME
+- Nautilus/Samba no desktop
+- reboot pos-instalacao
 
-## Procedimento De Teste Completo Em Ubuntu Desktop
+## Teste Completo Em Ubuntu Desktop
+
+Use `virt-manager` ou `GNOME Boxes` com `Ubuntu 24.04 Desktop`.
+
+Configuracao sugerida:
+
+- `2 vCPU`
+- `4 GB RAM` no minimo
+- `30 GB` de disco
+- snapshot logo apos a instalacao limpa
+
+Procedimento:
 
 1. Crie uma VM com `Ubuntu 24.04 Desktop`.
-2. Faça login e rode atualização básica do sistema.
+2. Faca login e rode atualizacao basica do sistema.
 3. Tire um snapshot chamado `clean-install`.
-4. Clone este repositório na VM.
+4. Clone este repositorio na VM.
 5. Rode:
 
 ```bash
 chmod +x install.sh
-./install.sh --theme=tokyo-night
+./install.sh --distro=ubuntu --theme=tokyo-night
 ```
 
 6. Reinicie a VM.
-7. Valide os itens abaixo.
+7. Valide o checklist Ubuntu.
 
-## Checklist Pós-Instalação
+## Checklist Ubuntu
 
-- `gh`, `eza`, `batcat`, `bun`, `uv`, `composer`, `podman` instalados
+- `gh`, `eza`, `batcat`, `fdfind`, `btm`, `bun`, `uv`, `composer`, `podman` instalados
 - alias `ls="eza"` presente no `~/.bashrc`
 - alias `bat="batcat"` presente no `~/.bashrc`
+- alias `fd="fdfind"` presente no `~/.bashrc`
 - aliases `copy` e `paste` presentes
 - `flatpak` funcionando
 - apps desktop instalados
-- `flameshot` associado à tecla `Print`
+- `flameshot` associado a tecla `Print`
 - fontes copiadas para `~/.local/share/fonts/new-linux-fresh-config`
 - `fc-cache` executado sem erro
-- `samba` instalado
-- `smbclient` instalado
-- usuário no grupo `sambashare`
-- `nautilus-share` disponível no Nautilus
+- `samba`, `smbclient` e `nautilus-share` instalados
+- usuario no grupo `sambashare`
+- compartilhamento aparece no Nautilus
 - tema aplicado no GNOME
 - wallpaper alterado
 
-## Estratégia Recomendada
+## Teste Completo Em Nobara Desktop
 
-Use os dois testes:
+Use uma VM Nobara Desktop real. Para Nobara, o teste em container Fedora e apenas uma regressao rapida do caminho CLI.
 
-- `./test.sh` para regressão rápida em VM limpa
-- VM Desktop manual para validar integração real do ambiente gráfico
+Configuracao sugerida:
+
+- `2 vCPU`
+- `6 GB RAM` no minimo
+- `40 GB` de disco
+- snapshot logo apos a instalacao limpa
+
+Procedimento:
+
+1. Crie uma VM com Nobara Desktop.
+2. Faca login e rode atualizacao basica do sistema.
+3. Tire um snapshot chamado `clean-install`.
+4. Clone este repositorio na VM.
+5. Rode:
+
+```bash
+chmod +x install.sh install-fedora.sh
+./install.sh --distro=nobara --theme=tokyo-night
+```
+
+6. Reinicie a VM.
+7. Valide o checklist Nobara.
+
+## Checklist Nobara/Fedora
+
+- `gh`, `eza`, `bat`, `fd`, `btm`, `bun`, `uv`, `composer`, `podman` instalados
+- alias `ls="eza"` presente no `~/.bashrc`
+- alias `bottom="btm"` presente no `~/.bashrc`
+- aliases `copy` e `paste` presentes
+- `flatpak` funcionando com Flathub em modo system
+- apps desktop instalados
+- `flameshot` associado a tecla `Print`
+- fontes copiadas para `~/.local/share/fonts/new-linux-fresh-config`
+- `fc-cache` executado sem erro
+- `samba` e `samba-client` instalados
+- servico `smb` reinicia sem erro
+- usuario no grupo `sambashare`
+- `/var/lib/samba/usershares` existe com grupo `sambashare` e permissao `1770`
+- compartilhamento de arquivos validado no desktop
+- tema aplicado no GNOME
+- wallpaper alterado
+
+## Estrategia Recomendada
+
+Use os testes em camadas:
+
+- `./test.sh --distro=ubuntu --mode=multipass` para regressao Ubuntu em VM limpa
+- `./test.sh --distro=fedora --mode=container` para regressao rapida Fedora/Nobara
+- VM Ubuntu Desktop para validar integracao grafica Ubuntu
+- VM Nobara Desktop para validar integracao grafica Nobara
 
 ## Troubleshooting
 
@@ -130,7 +206,7 @@ Use os dois testes:
 
 Se o host estiver com `/etc/resolv.conf` apontando para `Valet Linux`, o `multipassd` pode falhar ao subir o `dnsmasq`.
 
-Sinal típico:
+Sinal tipico:
 
 - `failed to open file ... multipass_root_cert.pem`
 - `snap services multipass` alternando entre `active` e `inactive`
@@ -148,7 +224,7 @@ Se ele apontar para algo como `/opt/valet-linux/resolv.conf`, troque temporariam
 sudo rm -f /etc/resolv.conf
 printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' | sudo tee /etc/resolv.conf >/dev/null
 sudo snap restart multipass.multipassd
-./test.sh
+./test.sh --distro=ubuntu --mode=multipass
 ```
 
-Depois do teste, restaure o setup do Valet se você ainda precisar dele.
+Depois do teste, restaure o setup do Valet se voce ainda precisar dele.

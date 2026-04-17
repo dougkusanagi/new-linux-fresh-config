@@ -10,7 +10,7 @@ export SELECTED_THEME
 usage() {
   cat <<'EOF'
 Usage:
-  ./install.sh [--theme=NAME] [--list-themes] [--help]
+  ./install-fedora.sh [--theme=NAME] [--list-themes] [--help]
 
 Options:
   --theme=NAME
@@ -48,7 +48,7 @@ parse_args() {
   done
 }
 
-trap 'echo "A instalacao falhou. Voce pode tentar novamente com: ./install.sh"' ERR
+trap 'echo "A instalacao falhou. Voce pode tentar novamente com: ./install-fedora.sh"' ERR
 
 # shellcheck source=/dev/null
 source "$INSTALL_ROOT/lib.sh"
