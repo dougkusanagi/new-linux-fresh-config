@@ -81,9 +81,10 @@ run_quiet() {
   if "$@" >"$log_file" 2>&1; then
     rm -f "$log_file"
     return 0
+  else
+    exit_code=$?
   fi
 
-  exit_code=$?
   error "Command failed: $*"
   sed -n '1,120p' "$log_file" >&2 || true
   rm -f "$log_file"
@@ -112,11 +113,12 @@ dnf_package_installed() {
 }
 
 dnf_update() {
-  run_quiet sudo dnf makecache -y || true
+  run_quiet sudo dnf makecache -y
   success "Package index updated"
 }
 
 dnf_install() {
+  local allow_skip="${DNF_ALLOW_SKIP_UNAVAILABLE:-false}"
   local packages=("$@")
   local missing_packages=()
   local package
@@ -134,15 +136,26 @@ dnf_install() {
     return
   fi
 
-  run_quiet sudo dnf install -y --skip-unavailable "${missing_packages[@]}"
+  if [[ "$allow_skip" == "true" ]]; then
+    run_quiet sudo dnf install -y --skip-unavailable "${missing_packages[@]}"
+  else
+    run_quiet sudo dnf install -y "${missing_packages[@]}"
+  fi
 
   for package in "${missing_packages[@]}"; do
     if dnf_package_installed "$package"; then
       success "$package installed"
-    else
+    elif [[ "$allow_skip" == "true" ]]; then
       warn "$package was not available and was skipped"
+    else
+      error "$package was not installed"
+      return 1
     fi
   done
+}
+
+dnf_install_optional() {
+  DNF_ALLOW_SKIP_UNAVAILABLE=true dnf_install "$@"
 }
 
 normalize_theme_name() {
@@ -217,7 +230,7 @@ install_sd() {
   local tmpdir url
   tmpdir="$(mktemp -d)"
   url="$(curl -sL https://api.github.com/repos/chmln/sd/releases/latest | jq -r '.assets[] | select(.name | test("x86_64.*linux-gnu\\.tar\\.gz$")) | .browser_download_url')"
-  run_quiet bash -lc "curl -sSfL '$url' | tar xz -C '$tmpdir' && sudo mv '$tmpdir/sd' /usr/local/bin/sd"
+  run_quiet bash -lc "curl -sSfL '$url' | tar xz -C '$tmpdir' && sudo mv '$tmpdir'/*/sd /usr/local/bin/sd"
   rm -rf "$tmpdir"
   success "sd installed"
 }
