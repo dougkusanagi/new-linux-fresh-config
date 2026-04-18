@@ -243,6 +243,38 @@ download_file() {
   curl -fsSL "$url" -o "$destination"
 }
 
+github_latest_asset_url() {
+  local repo="$1"
+  local pattern="$2"
+
+  curl -fsSL "https://api.github.com/repos/$repo/releases/latest" \
+    | jq -r --arg pattern "$pattern" '.assets[] | select(.name | test($pattern)) | .browser_download_url' \
+    | head -n 1
+}
+
+install_npm_global_package() {
+  local command_name="$1"
+  local package_name="$2"
+
+  if command_exists "$command_name"; then
+    log "$command_name is already available."
+    return
+  fi
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would install npm package globally: $package_name"
+    return
+  fi
+
+  if ! command_exists npm; then
+    error "npm is required to install $package_name."
+    return 1
+  fi
+
+  run_quiet sudo npm install -g "$package_name"
+  success "$command_name installed"
+}
+
 install_dust() {
   if command_exists dust; then
     log "dust is already available."
@@ -251,6 +283,160 @@ install_dust() {
 
   run_quiet bash -lc 'curl -sSfL https://raw.githubusercontent.com/bootandy/dust/refs/heads/master/install.sh | sh'
   success "dust installed"
+}
+
+install_lazygit() {
+  if command_exists lazygit; then
+    log "lazygit is already available."
+    return
+  fi
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would install lazygit from GitHub releases"
+    return
+  fi
+
+  local asset_arch tmpdir url
+  case "$(uname -m)" in
+    x86_64|amd64)
+      asset_arch="x86_64"
+      ;;
+    aarch64|arm64)
+      asset_arch="arm64"
+      ;;
+    *)
+      error "Unsupported lazygit architecture: $(uname -m)"
+      return 1
+      ;;
+  esac
+
+  url="$(github_latest_asset_url "jesseduffield/lazygit" "linux_${asset_arch}\\.tar\\.gz$")"
+  if [[ -z "$url" ]]; then
+    error "Could not find a lazygit release asset for linux_${asset_arch}."
+    return 1
+  fi
+
+  tmpdir="$(mktemp -d)"
+  run_quiet bash -lc "curl -sSfL '$url' | tar xz -C '$tmpdir' lazygit && sudo install -m 0755 '$tmpdir/lazygit' /usr/local/bin/lazygit"
+  rm -rf "$tmpdir"
+  success "lazygit installed"
+}
+
+install_atuin() {
+  if command_exists atuin; then
+    log "atuin is already available."
+    return
+  fi
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would install atuin from GitHub releases"
+    return
+  fi
+
+  local target tmpdir url binary
+  case "$(uname -m)" in
+    x86_64|amd64)
+      target="x86_64-unknown-linux-gnu"
+      ;;
+    aarch64|arm64)
+      target="aarch64-unknown-linux-gnu"
+      ;;
+    *)
+      error "Unsupported atuin architecture: $(uname -m)"
+      return 1
+      ;;
+  esac
+
+  url="$(github_latest_asset_url "atuinsh/atuin" "atuin-${target}\\.tar\\.gz$")"
+  if [[ -z "$url" ]]; then
+    error "Could not find an atuin release asset for $target."
+    return 1
+  fi
+
+  tmpdir="$(mktemp -d)"
+  run_quiet bash -lc "curl -sSfL '$url' | tar xz -C '$tmpdir'"
+  binary="$(find "$tmpdir" -type f -name atuin -perm /111 | head -n 1)"
+  if [[ -z "$binary" ]]; then
+    rm -rf "$tmpdir"
+    error "Could not find the atuin binary in the release archive."
+    return 1
+  fi
+  run_quiet sudo install -m 0755 "$binary" /usr/local/bin/atuin
+  rm -rf "$tmpdir"
+  success "atuin installed"
+}
+
+install_yazi() {
+  if command_exists yazi && command_exists ya; then
+    log "yazi is already available."
+    return
+  fi
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would install yazi from GitHub releases"
+    return
+  fi
+
+  local target tmpdir url yazi_binary ya_binary
+  case "$(uname -m)" in
+    x86_64|amd64)
+      target="x86_64-unknown-linux-gnu"
+      ;;
+    aarch64|arm64)
+      target="aarch64-unknown-linux-gnu"
+      ;;
+    *)
+      error "Unsupported yazi architecture: $(uname -m)"
+      return 1
+      ;;
+  esac
+
+  url="$(github_latest_asset_url "sxyazi/yazi" "yazi-${target}\\.zip$")"
+  if [[ -z "$url" ]]; then
+    error "Could not find a yazi release asset for $target."
+    return 1
+  fi
+
+  tmpdir="$(mktemp -d)"
+  run_quiet bash -lc "curl -sSfL '$url' -o '$tmpdir/yazi.zip' && unzip -q '$tmpdir/yazi.zip' -d '$tmpdir'"
+  yazi_binary="$(find "$tmpdir" -type f -name yazi -perm /111 | head -n 1)"
+  ya_binary="$(find "$tmpdir" -type f -name ya -perm /111 | head -n 1)"
+  if [[ -z "$yazi_binary" || -z "$ya_binary" ]]; then
+    rm -rf "$tmpdir"
+    error "Could not find yazi and ya binaries in the release archive."
+    return 1
+  fi
+  run_quiet sudo install -m 0755 "$yazi_binary" /usr/local/bin/yazi
+  run_quiet sudo install -m 0755 "$ya_binary" /usr/local/bin/ya
+  rm -rf "$tmpdir"
+  success "yazi installed"
+}
+
+install_opencode_desktop() {
+  if apt_package_installed opencode-desktop || command_exists opencode-desktop; then
+    log "OpenCode Desktop is already installed."
+    return
+  fi
+
+  case "$(uname -m)" in
+    x86_64|amd64)
+      ;;
+    *)
+      error "OpenCode Desktop Linux package is only available for x86_64 from opencode.ai."
+      return 1
+      ;;
+  esac
+
+  local package_file="/tmp/opencode-desktop.deb"
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would install OpenCode Desktop from https://opencode.ai/download/stable/linux-x64-deb"
+    return
+  fi
+
+  download_file "https://opencode.ai/download/stable/linux-x64-deb" "$package_file"
+  run_quiet sudo apt-get install -y "$package_file"
+  rm -f "$package_file"
+  success "OpenCode Desktop installed"
 }
 
 detect_desktop() {

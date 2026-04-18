@@ -7,6 +7,7 @@ apt_install \
   bat \
   btm \
   fd-find \
+  fzf \
   git \
   curl \
   wget \
@@ -18,6 +19,8 @@ apt_install \
   tealdeer \
   apt-transport-https \
   jq \
+  nodejs \
+  npm \
   xsel \
   unzip
 
@@ -48,6 +51,12 @@ add_line_if_missing 'alias bottom="btm"' "$TARGET_HOME/.bashrc"
 success "Shell aliases configured: ls, bat, fd, bottom"
 
 install_dust
+install_lazygit
+install_atuin
+install_yazi
+install_npm_global_package opencode opencode-ai
+install_npm_global_package codex @openai/codex
+add_line_if_missing 'eval "$(atuin init bash)"' "$TARGET_HOME/.bashrc"
 
 apt_install podman
 sudo mkdir -p /etc/containers/registries.conf.d

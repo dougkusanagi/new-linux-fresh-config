@@ -7,6 +7,7 @@ flatpak_install_app "io.github.zen_browser.zen"
 flatpak_install_app "md.obsidian.Obsidian"
 flatpak_install_app "com.discordapp.Discord"
 flatpak_install_app "com.stremio.Stremio"
+install_opencode_desktop
 
 if command -v zed >/dev/null 2>&1; then
   log "Zed is already available."

@@ -508,6 +508,10 @@ run_local_static_checks() {
   run_quiet bash -n $(syntax_files)
   success "Shell syntax validated"
 
+  log "Validating developer tool coverage..."
+  run_quiet bash tests/dev-tools.sh
+  success "Developer tool coverage validated"
+
   log "Validating theme list..."
   run_quiet "./$SCRIPT_NAME" --list-themes
   success "Theme list validated"

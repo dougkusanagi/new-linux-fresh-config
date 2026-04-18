@@ -7,6 +7,7 @@ dnf_install \
   bat \
   bottom \
   fd-find \
+  fzf \
   git \
   curl \
   wget \
@@ -15,6 +16,8 @@ dnf_install \
   ripgrep \
   tealdeer \
   jq \
+  nodejs \
+  npm \
   xsel \
   unzip \
   dnf-plugins-core
@@ -36,6 +39,12 @@ success "Shell aliases configured: ls, bottom"
 
 install_sd
 install_dust
+install_lazygit
+install_atuin
+install_yazi
+install_npm_global_package opencode opencode-ai
+install_npm_global_package codex @openai/codex
+add_line_if_missing 'eval "$(atuin init bash)"' "$TARGET_HOME/.bashrc"
 
 dnf_install podman
 if [[ "$DRY_RUN" == "true" ]]; then
