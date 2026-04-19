@@ -207,6 +207,11 @@ add_line_if_missing() {
   local line="$1"
   local file="$2"
 
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would ensure line exists in $file: $line"
+    return
+  fi
+
   touch "$file"
 
   if ! grep -Fqx "$line" "$file"; then
@@ -238,6 +243,11 @@ flatpak_install_app() {
 download_file() {
   local url="$1"
   local destination="$2"
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would download $url to $destination"
+    return
+  fi
 
   mkdir -p "$(dirname "$destination")"
   curl -fsSL "$url" -o "$destination"
@@ -492,6 +502,12 @@ apply_selected_theme() {
   local theme_dir="$omakub_root/themes/$theme"
 
   log "Applying theme: $theme"
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would download and apply theme: $theme"
+    return
+  fi
+
   download_file "$OMAKUB_THEME_REPO/themes/$theme/background.jpg" "$theme_dir/background.jpg"
   download_file "$OMAKUB_THEME_REPO/themes/$theme/gnome.sh" "$theme_dir/gnome.sh"
   download_file "$OMAKUB_THEME_REPO/themes/set-gnome-theme.sh" "$omakub_root/themes/set-gnome-theme.sh"

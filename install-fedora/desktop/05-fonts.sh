@@ -11,6 +11,11 @@ if [[ ! -d "$FONT_SOURCE_DIR" ]]; then
 fi
 
 log "Installing local fonts from install/fonts..."
+if [[ "$DRY_RUN" == "true" ]]; then
+  log "[DRY-RUN] Would install local fonts into $FONT_DEST_DIR"
+  return
+fi
+
 mkdir -p "$FONT_DEST_DIR"
 
 while IFS= read -r -d '' font_file; do

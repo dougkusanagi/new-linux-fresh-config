@@ -18,13 +18,21 @@ apt_install gnome-tweaks timeshift flameshot
 apt_install samba smbclient nautilus-share
 run_quiet sudo adduser "$TARGET_USER" sambashare
 success "User added to sambashare: $TARGET_USER"
-sudo mkdir -p /var/lib/samba/usershares
-sudo chown root:sambashare /var/lib/samba/usershares
-sudo chmod 1770 /var/lib/samba/usershares
+if [[ "$DRY_RUN" == "true" ]]; then
+  log "[DRY-RUN] Would configure Samba usershare directory"
+else
+  sudo mkdir -p /var/lib/samba/usershares
+  sudo chown root:sambashare /var/lib/samba/usershares
+  sudo chmod 1770 /var/lib/samba/usershares
+fi
 success "Samba usershare directory configured"
 
 if command -v systemctl >/dev/null 2>&1; then
-  sudo systemctl restart smbd
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would restart smbd"
+  else
+    sudo systemctl restart smbd
+  fi
   success "smbd restarted"
 else
   warn "systemctl is not available. Restart smbd manually if needed."

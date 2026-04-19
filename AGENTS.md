@@ -1,0 +1,2 @@
+- Quando criar uma nova feature, sempre crie testes pra manter o sistema funcionando
+- Sempre que alterar algo, rode os testes. Caso seja necessário, crie novos pra testar as novas features

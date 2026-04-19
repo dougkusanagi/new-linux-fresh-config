@@ -27,26 +27,38 @@ apt_install \
 
 if command -v systemctl >/dev/null 2>&1; then
   log "Enabling MySQL service..."
-  sudo systemctl enable mysql || true
-  sudo systemctl start mysql || true
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would enable and start MySQL service"
+  else
+    sudo systemctl enable mysql || true
+    sudo systemctl start mysql || true
+  fi
   success "MySQL service enabled"
 fi
 
-if run_quiet sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY ''; FLUSH PRIVILEGES;"; then
-  success "MySQL root account configured with empty password"
+if [[ "$DRY_RUN" == "true" ]]; then
+  log "[DRY-RUN] Would configure MySQL root account"
 else
-  warn "Could not update the MySQL root user."
+  if run_quiet sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY ''; FLUSH PRIVILEGES;"; then
+    success "MySQL root account configured with empty password"
+  else
+    warn "Could not update the MySQL root user."
+  fi
 fi
 
 if command -v composer >/dev/null 2>&1; then
   log "Composer is already available."
 else
   log "Installing Composer..."
-  run_quiet php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-  run_quiet php composer-setup.php
-  sudo mv composer.phar /usr/local/bin/composer
-  rm -f composer-setup.php
-  success "Composer installed"
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would install Composer"
+  else
+    run_quiet php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+    run_quiet php composer-setup.php
+    sudo mv composer.phar /usr/local/bin/composer
+    rm -f composer-setup.php
+    success "Composer installed"
+  fi
 fi
 
 add_line_if_missing "export PATH=\"\$HOME/.config/composer/vendor/bin:\$PATH\"" "$TARGET_HOME/.bashrc"

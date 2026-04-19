@@ -8,6 +8,7 @@ DISTRO_EXPLICIT="false"
 SCRIPT_NAME=""
 SCRIPT_EXPLICIT="false"
 INSTALL_DIR=""
+INSTALLER_ARGS=()
 CONTAINER_IMAGE=""
 CONTAINER_IMAGE_EXPLICIT="false"
 CONTAINER_NAME="setup-script-test"
@@ -95,7 +96,7 @@ Options:
       desktop customizations.
 
   --mode=static
-      Runs local shell syntax and --list-themes checks only.
+      Runs local shell syntax, project structure, and --list-themes checks only.
 
   --syntax-only
       Validate shell syntax and --list-themes without executing the installer.
@@ -202,9 +203,10 @@ configure_target() {
 
   case "$DISTRO" in
     ubuntu)
-      INSTALL_DIR="install"
+      INSTALL_DIR="install-ubuntu"
       if [[ "$SCRIPT_EXPLICIT" == "false" ]]; then
         SCRIPT_NAME="install.sh"
+        INSTALLER_ARGS=(--distro=ubuntu)
       fi
       if [[ "$CONTAINER_IMAGE_EXPLICIT" == "false" ]]; then
         CONTAINER_IMAGE="ubuntu:24.04"
@@ -213,7 +215,8 @@ configure_target() {
     fedora)
       INSTALL_DIR="install-fedora"
       if [[ "$SCRIPT_EXPLICIT" == "false" ]]; then
-        SCRIPT_NAME="install-fedora.sh"
+        SCRIPT_NAME="install.sh"
+        INSTALLER_ARGS=(--distro=fedora)
       fi
       if [[ "$CONTAINER_IMAGE_EXPLICIT" == "false" ]]; then
         CONTAINER_IMAGE="fedora:latest"
@@ -222,7 +225,8 @@ configure_target() {
     nobara)
       INSTALL_DIR="install-fedora"
       if [[ "$SCRIPT_EXPLICIT" == "false" ]]; then
-        SCRIPT_NAME="install-fedora.sh"
+        SCRIPT_NAME="install.sh"
+        INSTALLER_ARGS=(--distro=nobara)
       fi
       if [[ "$CONTAINER_IMAGE_EXPLICIT" == "false" ]]; then
         CONTAINER_IMAGE="fedora:latest"
@@ -319,6 +323,11 @@ syntax_files() {
 
 syntax_files_inline() {
   syntax_files | tr '\n' ' '
+}
+
+installer_command_inline() {
+  local command=("./$SCRIPT_NAME" "${INSTALLER_ARGS[@]}")
+  printf "%q " "${command[@]}"
 }
 
 bootstrap_command() {
@@ -508,12 +517,16 @@ run_local_static_checks() {
   run_quiet bash -n $(syntax_files)
   success "Shell syntax validated"
 
+  log "Validating project structure..."
+  run_quiet bash tests/project-structure.sh
+  success "Project structure validated"
+
   log "Validating developer tool coverage..."
   run_quiet bash tests/dev-tools.sh
   success "Developer tool coverage validated"
 
   log "Validating theme list..."
-  run_quiet "./$SCRIPT_NAME" --list-themes
+  run_quiet "./$SCRIPT_NAME" "${INSTALLER_ARGS[@]}" --list-themes
   success "Theme list validated"
 }
 
@@ -546,12 +559,12 @@ run_container_test() {
       bash -n $(syntax_files_inline)
 
       echo '[INFO] Validating theme list...'
-      sudo -u testuser env HOME=/home/testuser ./'$SCRIPT_NAME' --list-themes >/dev/null
+      sudo -u testuser env HOME=/home/testuser $(installer_command_inline) --list-themes >/dev/null
 
       if [[ '$RUN_INSTALLER' == 'true' ]]; then
         echo '[INFO] Executing installer inside the container...'
         chmod +x '$SCRIPT_NAME'
-        sudo -u testuser env HOME=/home/testuser ./'$SCRIPT_NAME'
+        sudo -u testuser env HOME=/home/testuser $(installer_command_inline)
       else
         echo '[INFO] Skipping installer execution because --syntax-only was used.'
       fi
@@ -617,7 +630,7 @@ run_vm_test() {
   run_quiet multipass exec "$VM_NAME" -- bash -lc "
     set -Eeuo pipefail
     cd '$VM_WORKDIR'
-    ./'$SCRIPT_NAME' --list-themes >/dev/null
+    $(installer_command_inline) --list-themes >/dev/null
   "
   success "Theme list validated"
 
@@ -631,7 +644,7 @@ run_vm_test() {
     set -Eeuo pipefail
     cd '$VM_WORKDIR'
     chmod +x '$SCRIPT_NAME'
-    ./'$SCRIPT_NAME' --distro=ubuntu
+    $(installer_command_inline)
   " || return $?
   success "Installer completed in VM"
 }
