@@ -314,6 +314,8 @@ require_paths() {
 syntax_files() {
   printf "%s\n" \
     "$SCRIPT_NAME" \
+    "test.sh" \
+    tests/*.sh \
     "$INSTALL_DIR/lib.sh" \
     "$INSTALL_DIR/terminal.sh" \
     "$INSTALL_DIR/desktop.sh" \
@@ -321,8 +323,23 @@ syntax_files() {
     "$INSTALL_DIR"/desktop/*.sh
 }
 
-syntax_files_inline() {
-  syntax_files | tr '\n' ' '
+run_shell_syntax_checks() {
+  local file
+
+  while IFS= read -r file; do
+    run_quiet bash -n "$file"
+  done < <(syntax_files)
+}
+
+run_shellcheck() {
+  if ! command_exists shellcheck; then
+    warn "shellcheck is not installed; skipping ShellCheck."
+    return
+  fi
+
+  local files=()
+  mapfile -t files < <(syntax_files)
+  run_quiet shellcheck -x "${files[@]}"
 }
 
 installer_command_inline() {
@@ -336,13 +353,13 @@ bootstrap_command() {
       cat <<'EOF'
 export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update
-sudo apt-get install -y bash ca-certificates curl git jq sudo wget software-properties-common xsel unzip fontconfig
+sudo apt-get install -y bash ca-certificates curl git jq sudo wget software-properties-common xsel unzip fontconfig shellcheck
 EOF
       ;;
     fedora|nobara)
       cat <<'EOF'
 sudo dnf makecache -y
-sudo dnf install -y bash ca-certificates curl git jq sudo wget xsel unzip fontconfig findutils
+sudo dnf install -y bash ca-certificates curl git jq sudo wget xsel unzip fontconfig findutils ShellCheck
 EOF
       ;;
   esac
@@ -354,7 +371,7 @@ container_bootstrap_command() {
       cat <<'EOF'
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y bash ca-certificates curl git jq sudo wget software-properties-common xsel unzip fontconfig
+apt-get install -y bash ca-certificates curl git jq sudo wget software-properties-common xsel unzip fontconfig shellcheck
 if ! id testuser >/dev/null 2>&1; then
   useradd -m -s /bin/bash testuser
 fi
@@ -365,7 +382,7 @@ EOF
     fedora|nobara)
       cat <<'EOF'
 dnf makecache -y
-dnf install -y bash ca-certificates curl git jq sudo wget xsel unzip fontconfig findutils
+dnf install -y bash ca-certificates curl git jq sudo wget xsel unzip fontconfig findutils ShellCheck
 if ! id testuser >/dev/null 2>&1; then
   useradd -m -s /bin/bash testuser
 fi
@@ -514,8 +531,12 @@ cleanup() {
 run_local_static_checks() {
   section "Local Static Checks"
   log "Validating shell syntax for $SCRIPT_NAME and $INSTALL_DIR..."
-  run_quiet bash -n $(syntax_files)
+  run_shell_syntax_checks
   success "Shell syntax validated"
+
+  log "Running ShellCheck..."
+  run_shellcheck
+  success "ShellCheck completed"
 
   log "Validating project structure..."
   run_quiet bash tests/project-structure.sh
@@ -524,6 +545,14 @@ run_local_static_checks() {
   log "Validating developer tool coverage..."
   run_quiet bash tests/dev-tools.sh
   success "Developer tool coverage validated"
+
+  log "Validating desktop app manifests..."
+  run_quiet bash tests/desktop-apps.sh
+  success "Desktop app manifests validated"
+
+  log "Validating dry-run safety..."
+  run_quiet bash tests/dry-run.sh
+  success "Dry-run safety validated"
 
   log "Validating theme list..."
   run_quiet "./$SCRIPT_NAME" "${INSTALLER_ARGS[@]}" --list-themes
@@ -555,11 +584,8 @@ run_container_test() {
 
       $(container_bootstrap_command)
 
-      echo '[INFO] Validating shell syntax...'
-      bash -n $(syntax_files_inline)
-
-      echo '[INFO] Validating theme list...'
-      sudo -u testuser env HOME=/home/testuser $(installer_command_inline) --list-themes >/dev/null
+      echo '[INFO] Running static test suite...'
+      sudo -u testuser env HOME=/home/testuser ./test.sh --mode=static --distro='$DISTRO'
 
       if [[ '$RUN_INSTALLER' == 'true' ]]; then
         echo '[INFO] Executing installer inside the container...'
@@ -618,21 +644,13 @@ run_vm_test() {
   "
   success "Bootstrap packages ready in VM"
 
-  log "Validating installer syntax in VM..."
+  log "Running static test suite in VM..."
   run_quiet multipass exec "$VM_NAME" -- bash -lc "
     set -Eeuo pipefail
     cd '$VM_WORKDIR'
-    bash -n $(syntax_files_inline)
+    ./test.sh --mode=static --distro='$DISTRO'
   "
-  success "Installer syntax validated"
-
-  log "Validating theme list in VM..."
-  run_quiet multipass exec "$VM_NAME" -- bash -lc "
-    set -Eeuo pipefail
-    cd '$VM_WORKDIR'
-    $(installer_command_inline) --list-themes >/dev/null
-  "
-  success "Theme list validated"
+  success "Static test suite validated"
 
   if [[ "$RUN_INSTALLER" == "false" ]]; then
     warn "Skipping installer execution because --syntax-only was used."

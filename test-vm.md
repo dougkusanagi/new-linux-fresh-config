@@ -5,9 +5,9 @@
 Este projeto suporta dois fluxos de instalacao:
 
 1. Ubuntu, via `./install.sh` ou `./install.sh --distro=ubuntu`.
-2. Fedora/Nobara, via `./install.sh --distro=fedora`, `./install.sh --distro=nobara`, ou `./install-fedora.sh`.
+2. Fedora/Nobara, via `./install.sh --distro=fedora` ou `./install.sh --distro=nobara`.
 
-O `./install.sh` detecta a distro por `/etc/os-release` e escolhe o conjunto correto de scripts. O `./install-fedora.sh` continua existindo como atalho direto para Fedora/Nobara.
+O `./install.sh` detecta a distro por `/etc/os-release` e escolhe o conjunto correto de scripts.
 
 ## Teste Automatizado
 
@@ -86,6 +86,10 @@ O modo Multipass cobre apenas Ubuntu porque Multipass trabalha com imagens Ubunt
 O modo container valida:
 
 - sintaxe dos scripts da distro selecionada
+- ShellCheck, quando disponivel no ambiente
+- estrutura do projeto
+- cobertura basica de ferramentas e apps desktop
+- seguranca do `--dry-run` com stubs para comandos de sistema
 - `--list-themes`
 - bootstrap minimo de pacotes
 - caminho CLI do instalador
@@ -165,7 +169,7 @@ Procedimento:
 5. Rode:
 
 ```bash
-chmod +x install.sh install-fedora.sh
+chmod +x install.sh
 ./install.sh --distro=nobara --theme=tokyo-night
 ```
 

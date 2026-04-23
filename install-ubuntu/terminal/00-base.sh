@@ -30,9 +30,8 @@ if [[ "$DRY_RUN" == "true" ]]; then
 else
   sudo mkdir -p -m 755 /etc/apt/keyrings
   download_file https://cli.github.com/packages/githubcli-archive-keyring.gpg /tmp/githubcli-archive-keyring.gpg
-  cat /tmp/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+  sudo install -m 0644 /tmp/githubcli-archive-keyring.gpg /etc/apt/keyrings/githubcli-archive-keyring.gpg
   rm -f /tmp/githubcli-archive-keyring.gpg
-  sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
     | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
   apt_update
@@ -64,6 +63,7 @@ install_atuin
 install_yazi
 install_npm_global_package opencode opencode-ai
 install_npm_global_package codex @openai/codex
+# shellcheck disable=SC2016
 add_line_if_missing 'eval "$(atuin init bash)"' "$TARGET_HOME/.bashrc"
 
 apt_install podman

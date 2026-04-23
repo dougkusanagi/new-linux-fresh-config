@@ -13,7 +13,7 @@ assert_contains() {
   local file="$1"
   local expected="$2"
 
-  grep -Fq "$expected" "$file" || fail "Expected ${file#$ROOT_DIR/} to contain: $expected"
+  grep -Fq "$expected" "$file" || fail "Expected ${file#"$ROOT_DIR"/} to contain: $expected"
 }
 
 for distro in ubuntu fedora; do
@@ -30,10 +30,10 @@ for distro in ubuntu fedora; do
   assert_contains "$base_script" "install_yazi"
   assert_contains "$base_script" "install_npm_global_package opencode opencode-ai"
   assert_contains "$base_script" "install_npm_global_package codex @openai/codex"
+  # shellcheck disable=SC2016
   assert_contains "$base_script" 'eval "$(atuin init bash)"'
 
   assert_contains "$desktop_script" "install_opencode_desktop"
-  assert_contains "$desktop_script" 'flatpak_install_app "com.github.dynobo.normcap"'
 
   assert_contains "$lib_script" "github_latest_asset_url"
   assert_contains "$lib_script" "install_npm_global_package()"

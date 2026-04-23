@@ -44,6 +44,7 @@ install_atuin
 install_yazi
 install_npm_global_package opencode opencode-ai
 install_npm_global_package codex @openai/codex
+# shellcheck disable=SC2016
 add_line_if_missing 'eval "$(atuin init bash)"' "$TARGET_HOME/.bashrc"
 
 dnf_install podman

@@ -10,18 +10,18 @@ fail() {
 }
 
 assert_file() {
-  [[ -f "$1" ]] || fail "Expected file: ${1#$ROOT_DIR/}"
+  [[ -f "$1" ]] || fail "Expected file: ${1#"$ROOT_DIR"/}"
 }
 
 assert_dir() {
-  [[ -d "$1" ]] || fail "Expected directory: ${1#$ROOT_DIR/}"
+  [[ -d "$1" ]] || fail "Expected directory: ${1#"$ROOT_DIR"/}"
 }
 
 assert_contains() {
   local file="$1"
   local expected="$2"
 
-  grep -Fq "$expected" "$file" || fail "Expected ${file#$ROOT_DIR/} to contain: $expected"
+  grep -Fq "$expected" "$file" || fail "Expected ${file#"$ROOT_DIR"/} to contain: $expected"
 }
 
 assert_not_contains() {
@@ -29,7 +29,7 @@ assert_not_contains() {
   local unexpected="$2"
 
   if grep -Fq "$unexpected" "$file"; then
-    fail "Did not expect ${file#$ROOT_DIR/} to contain: $unexpected"
+    fail "Did not expect ${file#"$ROOT_DIR"/} to contain: $unexpected"
   fi
 }
 
@@ -50,7 +50,8 @@ assert_file "$ROOT_DIR/logs/.gitkeep"
 assert_contains "$ROOT_DIR/.gitignore" "/*.log"
 assert_contains "$ROOT_DIR/.gitignore" "/logs/*"
 assert_contains "$ROOT_DIR/.gitignore" "!/logs/.gitkeep"
-assert_contains "$ROOT_DIR/install.sh" 'LOG_DIR="$ROOT_DIR/logs"'
+# shellcheck disable=SC2016
+assert_contains "$ROOT_DIR/install.sh" 'LOG_DIR="${LOG_DIR:-$ROOT_DIR/logs}"'
 
 if find "$ROOT_DIR" -maxdepth 1 -type f -name 'install-*.log' | grep -q .; then
   fail "Runtime install logs must live under logs/, not the repository root."

@@ -7,7 +7,7 @@ REQUESTED_DISTRO="auto"
 DRY_RUN="false"
 INSTALL_FAMILY=""
 INSTALL_ROOT=""
-LOG_DIR="$ROOT_DIR/logs"
+LOG_DIR="${LOG_DIR:-$ROOT_DIR/logs}"
 SELECTED_THEME=""
 export SELECTED_THEME
 
@@ -174,7 +174,8 @@ main() {
   fi
 
   mkdir -p "$LOG_DIR"
-  export INSTALL_LOG="$LOG_DIR/install-$(date +%Y%m%d-%H%M%S)-$$.log"
+  INSTALL_LOG="$LOG_DIR/install-$(date +%Y%m%d-%H%M%S)-$$.log"
+  export INSTALL_LOG
   echo "Logging to: $INSTALL_LOG"
   log_to_file "INFO" "Installation started - $INSTALL_FAMILY"
 
