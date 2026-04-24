@@ -36,9 +36,15 @@ fi
 
 log "Installing eza..."
 dnf_install eza
-add_line_if_missing 'alias ls="eza"' "$TARGET_HOME/.bashrc"
+comment_line_if_present 'alias ls="eza"' "$TARGET_HOME/.bashrc"
+comment_line_if_present "alias l='ls -CF'" "$TARGET_HOME/.bashrc"
+comment_line_if_present 'alias l="ls -CF"' "$TARGET_HOME/.bashrc"
+add_line_if_missing "alias ls='eza'" "$TARGET_HOME/.bashrc"
+add_line_if_missing "alias ll='ls -alF'" "$TARGET_HOME/.bashrc"
+add_line_if_missing "alias la='ls -A'" "$TARGET_HOME/.bashrc"
+add_line_if_missing "alias l='ls -l'" "$TARGET_HOME/.bashrc"
 add_line_if_missing 'alias bottom="btm"' "$TARGET_HOME/.bashrc"
-success "Shell aliases configured: ls, bottom"
+success "Shell aliases configured: ls, ll, la, l, bottom"
 
 install_sd
 install_dust

@@ -5,7 +5,8 @@ section "Desktop Core"
 apt_install snapd
 
 run_quiet sudo add-apt-repository -y universe
-success "Universe repository enabled"
+run_quiet sudo add-apt-repository -y multiverse
+success "Universe and multiverse repositories enabled"
 apt_update
 apt_install libfuse2t64 || warn "libfuse2t64 is not available on this distribution."
 

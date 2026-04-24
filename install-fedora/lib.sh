@@ -285,6 +285,24 @@ add_line_if_missing() {
   fi
 }
 
+comment_line_if_present() {
+  local line="$1"
+  local file="$2"
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would comment line in $file if present: $line"
+    return
+  fi
+
+  touch "$file"
+
+  if grep -Fqx "$line" "$file"; then
+    local escaped_line
+    escaped_line="$(printf '%s\n' "$line" | sed 's/[\/&]/\\&/g')"
+    sed -i "s/^${escaped_line}$/# ${escaped_line}/" "$file"
+  fi
+}
+
 flatpak_install_app() {
   local app_id="$1"
 
@@ -508,8 +526,8 @@ install_sd() {
 }
 
 install_lm_studio() {
-  if command_exists lm-studio || [[ -x /opt/lm-studio/LM_Studio.AppImage ]]; then
-    log "LM Studio is already available."
+  if flatpak run it.mijorus.gearlever --list-installed 2>/dev/null | grep -Fqi "LM Studio"; then
+    log "LM Studio is already integrated with Gear Lever."
     return
   fi
 
@@ -528,36 +546,25 @@ install_lm_studio() {
   esac
 
   if [[ "$DRY_RUN" == "true" ]]; then
-    log "[DRY-RUN] Would install LM Studio AppImage from $url"
+    log "[DRY-RUN] Would download LM Studio AppImage from $url and integrate it with Gear Lever"
     return
   fi
 
-  local app_dir appimage bin_path desktop_file desktop_tmp package_file
-  app_dir="/opt/lm-studio"
-  appimage="$app_dir/LM_Studio.AppImage"
-  bin_path="/usr/local/bin/lm-studio"
-  desktop_file="/usr/local/share/applications/lm-studio.desktop"
-  desktop_tmp="$(mktemp)"
-  package_file="/tmp/LM_Studio.AppImage"
+  if ! flatpak info it.mijorus.gearlever >/dev/null 2>&1; then
+    error "Gear Lever must be installed before integrating LM Studio."
+    return 1
+  fi
 
+  local package_file
+  package_file="$TARGET_HOME/Downloads/LM_Studio.AppImage"
+
+  sudo rm -rf /opt/lm-studio
+  sudo rm -f /usr/local/bin/lm-studio /usr/local/share/applications/lm-studio.desktop
+  mkdir -p "$(dirname "$package_file")"
   download_file "$url" "$package_file"
-  run_quiet sudo install -d "$app_dir" /usr/local/share/applications
-  run_quiet sudo install -m 0755 "$package_file" "$appimage"
-  run_quiet sudo ln -sf "$appimage" "$bin_path"
-
-  cat > "$desktop_tmp" <<EOF
-[Desktop Entry]
-Type=Application
-Name=LM Studio
-Comment=Run local language models
-Exec=$appimage
-Terminal=false
-Categories=Development;Utility;
-EOF
-  run_quiet sudo install -m 0644 "$desktop_tmp" "$desktop_file"
-
-  rm -f "$package_file" "$desktop_tmp"
-  success "LM Studio installed"
+  chmod 0755 "$package_file"
+  run_quiet flatpak run it.mijorus.gearlever --integrate --replace --yes "$package_file"
+  success "LM Studio integrated with Gear Lever"
 }
 
 install_opencode_desktop() {
@@ -585,6 +592,131 @@ install_opencode_desktop() {
   run_quiet sudo dnf install -y "$package_file"
   rm -f "$package_file"
   success "OpenCode Desktop installed"
+}
+
+install_vscode_desktop() {
+  if dnf_package_installed code && command_exists code; then
+    log "Visual Studio Code is already installed."
+    return
+  fi
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would configure the official Visual Studio Code RPM repository and install code"
+    return
+  fi
+
+  run_quiet sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+  sudo tee /etc/yum.repos.d/vscode.repo > /dev/null <<'EOF'
+[code]
+name=Visual Studio Code
+baseurl=https://packages.microsoft.com/yumrepos/vscode
+enabled=1
+autorefresh=1
+type=rpm-md
+gpgcheck=1
+gpgkey=https://packages.microsoft.com/keys/microsoft.asc
+EOF
+
+  dnf_update
+  dnf_install code
+  success "Visual Studio Code installed with the code CLI"
+}
+
+install_google_chrome() {
+  if dnf_package_installed google-chrome-stable && command_exists google-chrome; then
+    log "Google Chrome is already installed."
+    return
+  fi
+
+  case "$(uname -m)" in
+    x86_64|amd64)
+      ;;
+    *)
+      error "Google Chrome official Linux package is only available for x86_64."
+      return 1
+      ;;
+  esac
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would configure the official Google Chrome RPM repository and install google-chrome-stable"
+    return
+  fi
+
+  sudo tee /etc/yum.repos.d/google-chrome.repo > /dev/null <<'EOF'
+[google-chrome]
+name=google-chrome
+baseurl=https://dl.google.com/linux/chrome/rpm/stable/x86_64
+enabled=1
+gpgcheck=1
+gpgkey=https://dl.google.com/linux/linux_signing_key.pub
+EOF
+
+  dnf_update
+  dnf_install google-chrome-stable
+  success "Google Chrome installed from the official rpm repository"
+}
+
+install_antigravity_desktop() {
+  if command_exists antigravity || [[ -x /opt/antigravity/antigravity ]]; then
+    log "Antigravity is already available."
+    return
+  fi
+
+  local platform
+  case "$(uname -m)" in
+    x86_64|amd64)
+      platform="linux-x64"
+      ;;
+    aarch64|arm64)
+      platform="linux-arm"
+      ;;
+    *)
+      error "Unsupported Antigravity architecture: $(uname -m)"
+      return 1
+      ;;
+  esac
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would fetch the latest Antigravity release and install the ${platform} tarball"
+    return
+  fi
+
+  local release_json version execution_id url
+  release_json="$(curl -fsSL https://antigravity-auto-updater-974169037036.us-central1.run.app/releases)"
+  version="$(jq -r '.[0].version' <<<"$release_json")"
+  execution_id="$(jq -r '.[0].execution_id' <<<"$release_json")"
+  url="https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/${version}-${execution_id}/${platform}/Antigravity.tar.gz"
+
+  local archive app_dir bin_path desktop_file desktop_tmp extract_dir icon_path
+  archive="/tmp/Antigravity.tar.gz"
+  app_dir="/opt/antigravity"
+  bin_path="/usr/local/bin/antigravity"
+  desktop_file="/usr/local/share/applications/antigravity.desktop"
+  desktop_tmp="$(mktemp)"
+  extract_dir="$(mktemp -d)"
+  icon_path="$app_dir/resources/app/resources/linux/code.png"
+
+  download_file "$url" "$archive"
+  run_quiet tar -xzf "$archive" -C "$extract_dir"
+  run_quiet sudo install -d /opt /usr/local/share/applications
+  sudo rm -rf "$app_dir"
+  run_quiet sudo mv "$extract_dir/Antigravity" "$app_dir"
+  run_quiet sudo ln -sf "$app_dir/antigravity" "$bin_path"
+
+  cat > "$desktop_tmp" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Antigravity
+Comment=Google Antigravity IDE
+Exec=$bin_path %F
+Icon=$icon_path
+Terminal=false
+Categories=Development;IDE;
+EOF
+  run_quiet sudo install -m 0644 "$desktop_tmp" "$desktop_file"
+
+  rm -rf "$archive" "$desktop_tmp" "$extract_dir"
+  success "Antigravity installed"
 }
 
 detect_desktop() {

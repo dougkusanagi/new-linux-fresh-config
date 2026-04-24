@@ -53,11 +53,17 @@ else
   apt_update
 fi
 apt_install eza
-add_line_if_missing 'alias ls="eza"' "$TARGET_HOME/.bashrc"
+comment_line_if_present 'alias ls="eza"' "$TARGET_HOME/.bashrc"
+comment_line_if_present "alias l='ls -CF'" "$TARGET_HOME/.bashrc"
+comment_line_if_present 'alias l="ls -CF"' "$TARGET_HOME/.bashrc"
+add_line_if_missing "alias ls='eza'" "$TARGET_HOME/.bashrc"
+add_line_if_missing "alias ll='ls -alF'" "$TARGET_HOME/.bashrc"
+add_line_if_missing "alias la='ls -A'" "$TARGET_HOME/.bashrc"
+add_line_if_missing "alias l='ls -l'" "$TARGET_HOME/.bashrc"
 add_line_if_missing 'alias bat="batcat"' "$TARGET_HOME/.bashrc"
 add_line_if_missing 'alias fd="fdfind"' "$TARGET_HOME/.bashrc"
 add_line_if_missing 'alias bottom="btm"' "$TARGET_HOME/.bashrc"
-success "Shell aliases configured: ls, bat, fd, bottom"
+success "Shell aliases configured: ls, ll, la, l, bat, fd, bottom"
 
 install_dust
 install_lazygit

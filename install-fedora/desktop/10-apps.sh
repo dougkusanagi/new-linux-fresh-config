@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 section "Desktop Apps"
-dnf_install_optional steam-devices joystick-support gamemode mangohud gamescope goverlay xone xpadneo
+dnf_install_optional steam-devices joystick-support gamemode mangohud gamescope goverlay xone xpadneo gnome-shell-extension-dash-to-dock
 
-flatpak_install_app "com.visualstudio.code"
-flatpak_install_app "com.google.Chrome"
+install_vscode_desktop
+install_google_chrome
 flatpak_install_app "io.podman_desktop.PodmanDesktop"
 flatpak_install_app "it.mijorus.gearlever"
 flatpak_install_app "org.qbittorrent.qBittorrent"
@@ -22,6 +22,7 @@ flatpak_install_app "com.heroicgameslauncher.hgl"
 flatpak_install_app "com.usebottles.bottles"
 install_lm_studio
 install_opencode_desktop
+install_antigravity_desktop
 
 if command -v zed >/dev/null 2>&1; then
   log "Zed is already available."

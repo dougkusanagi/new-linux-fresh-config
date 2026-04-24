@@ -11,6 +11,22 @@ LOG_DIR="$ROOT_DIR/logs"
 SELECTED_THEME=""
 export SELECTED_THEME
 
+if [[ -t 1 ]]; then
+  COLOR_RESET=$'\033[0m'
+  COLOR_BOLD=$'\033[1m'
+  COLOR_DIM=$'\033[2m'
+  COLOR_CYAN=$'\033[36m'
+  COLOR_GREEN=$'\033[32m'
+  COLOR_YELLOW=$'\033[33m'
+else
+  COLOR_RESET=""
+  COLOR_BOLD=""
+  COLOR_DIM=""
+  COLOR_CYAN=""
+  COLOR_GREEN=""
+  COLOR_YELLOW=""
+fi
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -140,6 +156,22 @@ parse_args() {
   done
 }
 
+show_install_intro() {
+  printf "\n%s" "${COLOR_BOLD}${COLOR_CYAN}"
+  cat <<'EOF'
+     _   __                 __    _                      
+    / | / /__ _      __    / /   (_)___  __  ___  __     
+   /  |/ / _ \ | /| / /   / /   / / __ \/ / / / |/_/     
+  / /|  /  __/ |/ |/ /   / /___/ / / / / /_/ />  <       
+ /_/ |_/\___/|__/|__/   /_____/_/_/ /_/\__,_/_/|_|       
+EOF
+  printf "%s\n" "$COLOR_RESET"
+  printf "%sFresh Config Installer%s\n" "${COLOR_BOLD}${COLOR_GREEN}" "$COLOR_RESET"
+  printf "%sDistro target:%s %s\n" "$COLOR_YELLOW" "$COLOR_RESET" "$INSTALL_FAMILY"
+  printf "%sScope:%s terminal tools, dev stack, desktop apps and GNOME polish\n" "$COLOR_YELLOW" "$COLOR_RESET"
+  printf "%sLog:%s %s\n\n" "$COLOR_DIM" "$COLOR_RESET" "$INSTALL_LOG"
+}
+
 trap 'echo "A instalacao falhou. Voce pode tentar novamente com: ./install.sh"' ERR
 
 preparse_args "$@"
@@ -175,9 +207,9 @@ main() {
 
   mkdir -p "$LOG_DIR"
   export INSTALL_LOG="$LOG_DIR/install-$(date +%Y%m%d-%H%M%S)-$$.log"
-  echo "Logging to: $INSTALL_LOG"
   log_to_file "INFO" "Installation started - $INSTALL_FAMILY"
 
+  show_install_intro
   echo "This is a very opinionated basic dev environment with PHP, Composer, Node and many desktop apps"
   log "Selected installer family: $INSTALL_FAMILY"
   echo
