@@ -21,9 +21,24 @@ apt_install \
   php-sqlite3 \
   php-redis \
   php-dom \
-  php-opcache \
   php-soap \
   mysql-server
+
+if [[ "$DRY_RUN" == "true" ]]; then
+  log "[DRY-RUN] Would ensure PHP OPcache is available"
+elif command -v php >/dev/null 2>&1 && php -m 2>/dev/null | grep -Fqi "Zend OPcache"; then
+  success "PHP OPcache is already available"
+else
+  PHP_OPCACHE_PACKAGES=(php-opcache)
+  while IFS= read -r package; do
+    [[ "$package" == "php-opcache" ]] || PHP_OPCACHE_PACKAGES+=("$package")
+  done < <(
+    apt-cache search --names-only '^php[0-9][0-9.]*-opcache$' 2>/dev/null \
+      | awk '{print $1}' \
+      | sort -Vr
+  )
+  apt_install_first_available "${PHP_OPCACHE_PACKAGES[@]}"
+fi
 
 if command -v systemctl >/dev/null 2>&1; then
   log "Enabling MySQL service..."

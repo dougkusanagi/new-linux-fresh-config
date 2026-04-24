@@ -20,7 +20,10 @@ dnf_install \
   npm \
   xsel \
   unzip \
-  dnf-plugins-core
+  dnf-plugins-core \
+  NetworkManager
+
+configure_static_ipv4_network
 
 if ! command_exists gh; then
   log "Configuring GitHub CLI repository..."

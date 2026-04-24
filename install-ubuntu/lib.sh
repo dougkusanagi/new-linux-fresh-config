@@ -6,6 +6,11 @@ REQUIRES_REBOOT="false"
 DRY_RUN="${DRY_RUN:-false}"
 TARGET_USER="${USER}"
 TARGET_HOME="${HOME}"
+STATIC_NETWORK_INTERFACE="${STATIC_NETWORK_INTERFACE:-enp5s0}"
+STATIC_NETWORK_CONNECTION="${STATIC_NETWORK_CONNECTION:-static-${STATIC_NETWORK_INTERFACE}}"
+STATIC_NETWORK_ADDRESS="${STATIC_NETWORK_ADDRESS:-192.168.1.77/24}"
+STATIC_NETWORK_GATEWAY="${STATIC_NETWORK_GATEWAY:-192.168.1.1}"
+STATIC_NETWORK_DNS="${STATIC_NETWORK_DNS:-1.1.1.1}"
 
 runUnlessDry() {
   if [[ "$DRY_RUN" == "true" ]]; then
@@ -142,6 +147,18 @@ apt_package_installed() {
   dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "install ok installed"
 }
 
+apt_package_available() {
+  local package="$1"
+  local candidate
+
+  candidate="$(
+    apt-cache policy "$package" 2>/dev/null \
+      | awk '/Candidate:/ {print $2; exit}'
+  )"
+
+  [[ -n "$candidate" && "$candidate" != "(none)" ]]
+}
+
 apt_update() {
   if [[ "$DRY_RUN" == "true" ]]; then
     log "[DRY-RUN] Would update package index"
@@ -179,6 +196,167 @@ apt_install() {
   for package in "${missing_packages[@]}"; do
     success "$package installed"
   done
+}
+
+apt_install_first_available() {
+  local package
+
+  if [[ "$#" -eq 0 ]]; then
+    return
+  fi
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would install first available package from: $*"
+    return
+  fi
+
+  for package in "$@"; do
+    if apt_package_available "$package"; then
+      apt_install "$package"
+      return
+    fi
+
+    log "Skipping unavailable package: $package"
+  done
+
+  warn "No available apt package found among: $*"
+}
+
+apt_install_optional() {
+  local available_packages=()
+  local package
+
+  if [[ "$#" -eq 0 ]]; then
+    return
+  fi
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would install optional packages when available: $*"
+    return
+  fi
+
+  for package in "$@"; do
+    if apt_package_available "$package"; then
+      available_packages+=("$package")
+    else
+      log "Skipping unavailable optional package: $package"
+    fi
+  done
+
+  if [[ "${#available_packages[@]}" -gt 0 ]]; then
+    apt_install "${available_packages[@]}"
+  fi
+}
+
+apt_keyring_exists() {
+  local keyring_path="$1"
+
+  sudo test -s "$keyring_path"
+}
+
+install_apt_keyring_file() {
+  local url="$1"
+  local keyring_path="$2"
+  local keyring_name
+
+  keyring_name="$(basename "$keyring_path")"
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would ensure apt keyring exists: $keyring_path"
+    return
+  fi
+
+  sudo mkdir -p -m 755 "$(dirname "$keyring_path")"
+
+  if apt_keyring_exists "$keyring_path"; then
+    log "Apt keyring already exists: $keyring_path"
+    sudo chmod go+r "$keyring_path"
+    return
+  fi
+
+  local tmpdir keyring_tmp
+  tmpdir="$(mktemp -d)"
+  keyring_tmp="$tmpdir/$keyring_name"
+
+  download_file "$url" "$keyring_tmp"
+  sudo install -m 0644 "$keyring_tmp" "$keyring_path"
+  rm -rf "$tmpdir"
+  success "Apt keyring installed: $keyring_path"
+}
+
+install_apt_dearmored_keyring() {
+  local url="$1"
+  local keyring_path="$2"
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would ensure apt keyring exists: $keyring_path"
+    return
+  fi
+
+  sudo mkdir -p -m 755 "$(dirname "$keyring_path")"
+
+  if apt_keyring_exists "$keyring_path"; then
+    log "Apt keyring already exists: $keyring_path"
+    sudo chmod go+r "$keyring_path"
+    return
+  fi
+
+  curl -fsSL "$url" | gpg --dearmor | sudo tee "$keyring_path" > /dev/null
+  sudo chmod go+r "$keyring_path"
+  success "Apt keyring installed: $keyring_path"
+}
+
+configure_static_ipv4_network() {
+  local interface="$STATIC_NETWORK_INTERFACE"
+  local connection="$STATIC_NETWORK_CONNECTION"
+  local previous_connections=()
+  local active_connection active_device
+
+  section "Network"
+  log "Configuring static IPv4 for $interface..."
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would configure $interface with $STATIC_NETWORK_ADDRESS, gateway $STATIC_NETWORK_GATEWAY, DNS $STATIC_NETWORK_DNS"
+    return
+  fi
+
+  if ! command_exists nmcli; then
+    warn "NetworkManager nmcli is not available; skipping static IPv4 configuration"
+    return
+  fi
+
+  if ! nmcli -t -f DEVICE device status | grep -Fxq "$interface"; then
+    warn "Network interface $interface was not found; skipping static IPv4 configuration"
+    return
+  fi
+
+  while IFS=: read -r active_connection active_device; do
+    if [[ "$active_device" == "$interface" && "$active_connection" != "$connection" ]]; then
+      previous_connections+=("$active_connection")
+    fi
+  done < <(nmcli -t -f NAME,DEVICE connection show --active)
+
+  if nmcli -t -f NAME connection show | grep -Fxq "$connection"; then
+    run_quiet nmcli connection modify "$connection" connection.interface-name "$interface"
+  else
+    run_quiet nmcli connection add type ethernet ifname "$interface" con-name "$connection"
+  fi
+
+  run_quiet nmcli connection modify "$connection" \
+    connection.autoconnect yes \
+    ipv4.method manual \
+    ipv4.addresses "$STATIC_NETWORK_ADDRESS" \
+    ipv4.gateway "$STATIC_NETWORK_GATEWAY" \
+    ipv4.dns "$STATIC_NETWORK_DNS" \
+    ipv4.ignore-auto-dns yes \
+    ipv6.ignore-auto-dns yes
+
+  for active_connection in "${previous_connections[@]}"; do
+    nmcli connection modify "$active_connection" connection.autoconnect no >/dev/null 2>&1 || true
+  done
+
+  run_quiet nmcli connection up "$connection"
+  success "Static IPv4 configured on $interface"
 }
 
 normalize_theme_name() {
@@ -420,6 +598,59 @@ install_yazi() {
   run_quiet sudo install -m 0755 "$ya_binary" /usr/local/bin/ya
   rm -rf "$tmpdir"
   success "yazi installed"
+}
+
+install_lm_studio() {
+  if command_exists lm-studio || [[ -x /opt/lm-studio/LM_Studio.AppImage ]]; then
+    log "LM Studio is already available."
+    return
+  fi
+
+  local url
+  case "$(uname -m)" in
+    x86_64|amd64)
+      url="https://lmstudio.ai/download/latest/linux/x64?format=AppImage"
+      ;;
+    aarch64|arm64)
+      url="https://lmstudio.ai/download/latest/linux/arm64?format=AppImage"
+      ;;
+    *)
+      error "Unsupported LM Studio architecture: $(uname -m)"
+      return 1
+      ;;
+  esac
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    log "[DRY-RUN] Would install LM Studio AppImage from $url"
+    return
+  fi
+
+  local app_dir appimage bin_path desktop_file desktop_tmp package_file
+  app_dir="/opt/lm-studio"
+  appimage="$app_dir/LM_Studio.AppImage"
+  bin_path="/usr/local/bin/lm-studio"
+  desktop_file="/usr/local/share/applications/lm-studio.desktop"
+  desktop_tmp="$(mktemp)"
+  package_file="/tmp/LM_Studio.AppImage"
+
+  download_file "$url" "$package_file"
+  run_quiet sudo install -d "$app_dir" /usr/local/share/applications
+  run_quiet sudo install -m 0755 "$package_file" "$appimage"
+  run_quiet sudo ln -sf "$appimage" "$bin_path"
+
+  cat > "$desktop_tmp" <<EOF
+[Desktop Entry]
+Type=Application
+Name=LM Studio
+Comment=Run local language models
+Exec=$appimage
+Terminal=false
+Categories=Development;Utility;
+EOF
+  run_quiet sudo install -m 0644 "$desktop_tmp" "$desktop_file"
+
+  rm -f "$package_file" "$desktop_tmp"
+  success "LM Studio installed"
 }
 
 install_opencode_desktop() {

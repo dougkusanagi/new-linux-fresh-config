@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 
 section "GNOME Tweaks"
-log "Configuring Flameshot shortcut and screenshot portal permission..."
+log "Configuring Flameshot as the primary Print Screen tool..."
 if [[ "$DRY_RUN" == "true" ]]; then
-  log "[DRY-RUN] Would configure Flameshot GNOME shortcut and screenshot portal permission"
+  log "[DRY-RUN] Would configure Flameshot as the primary Print Screen tool and screenshot portal permission"
   return
 fi
+
+set_gsettings_key_if_exists() {
+  local schema="$1"
+  local key="$2"
+  local value="$3"
+
+  if gsettings list-keys "$schema" | grep -Fxq "$key"; then
+    gsettings set "$schema" "$key" "$value"
+  fi
+}
 
 set_screenshot_portal_permission() {
   local app_id="$1"
@@ -34,6 +44,13 @@ set_screenshot_portal_permission() {
 existing_bindings="$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings)"
 target_path="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom-flameshot/"
 
+set_gsettings_key_if_exists org.gnome.settings-daemon.plugins.media-keys screenshot "[]"
+set_gsettings_key_if_exists org.gnome.settings-daemon.plugins.media-keys screenshot-clip "[]"
+set_gsettings_key_if_exists org.gnome.settings-daemon.plugins.media-keys area-screenshot "[]"
+set_gsettings_key_if_exists org.gnome.settings-daemon.plugins.media-keys area-screenshot-clip "[]"
+set_gsettings_key_if_exists org.gnome.settings-daemon.plugins.media-keys window-screenshot "[]"
+set_gsettings_key_if_exists org.gnome.settings-daemon.plugins.media-keys window-screenshot-clip "[]"
+
 if [[ "$existing_bindings" != *"$target_path"* ]]; then
   if [[ "$existing_bindings" == "[]" || "$existing_bindings" == "@as []" ]]; then
     new_bindings="['$target_path']"
@@ -52,4 +69,4 @@ gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$ta
 set_screenshot_portal_permission org.flameshot.Flameshot
 set_screenshot_portal_permission flameshot
 
-success "Flameshot shortcut and screenshot portal permission configured"
+success "Flameshot configured as the primary Print Screen tool"

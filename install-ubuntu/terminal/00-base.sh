@@ -22,17 +22,18 @@ apt_install \
   nodejs \
   npm \
   xsel \
-  unzip
+  unzip \
+  network-manager
+
+configure_static_ipv4_network
 
 log "Configuring GitHub CLI repository..."
 if [[ "$DRY_RUN" == "true" ]]; then
   log "[DRY-RUN] Would configure GitHub CLI repository"
 else
-  sudo mkdir -p -m 755 /etc/apt/keyrings
-  download_file https://cli.github.com/packages/githubcli-archive-keyring.gpg /tmp/githubcli-archive-keyring.gpg
-  cat /tmp/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
-  rm -f /tmp/githubcli-archive-keyring.gpg
-  sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+  install_apt_keyring_file \
+    https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    /etc/apt/keyrings/githubcli-archive-keyring.gpg
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
     | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
   apt_update
@@ -43,9 +44,9 @@ log "Configuring eza repository..."
 if [[ "$DRY_RUN" == "true" ]]; then
   log "[DRY-RUN] Would configure eza repository"
 else
-  sudo mkdir -p /etc/apt/keyrings
-  wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
-    | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+  install_apt_dearmored_keyring \
+    https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
+    /etc/apt/keyrings/gierens.gpg
   echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
     | sudo tee /etc/apt/sources.list.d/gierens.list > /dev/null
   sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
@@ -98,7 +99,9 @@ if ! grep -q "warpdotdev" /etc/apt/sources.list.d/*.list 2>/dev/null; then
   if [[ "$DRY_RUN" == "true" ]]; then
     log "[DRY-RUN] Would configure Warp repository"
   else
-    wget -qO- https://releases.warp.dev/linux/keys/warp.asc | sudo gpg --dearmor -o /etc/apt/keyrings/warpdotdev.gpg
+    install_apt_dearmored_keyring \
+      https://releases.warp.dev/linux/keys/warp.asc \
+      /etc/apt/keyrings/warpdotdev.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/warpdotdev.gpg] https://releases.warp.dev/linux/deb stable main" \
       | sudo tee /etc/apt/sources.list.d/warpdotdev.list > /dev/null
     sudo chmod 644 /etc/apt/keyrings/warpdotdev.gpg /etc/apt/sources.list.d/warpdotdev.list
