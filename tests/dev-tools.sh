@@ -36,11 +36,12 @@ for distro in ubuntu fedora; do
   assert_contains "$base_script" "nodejs"
   assert_contains "$base_script" "npm"
   assert_contains "$base_script" "install_lazygit"
-  assert_contains "$base_script" "install_atuin"
   assert_contains "$base_script" "install_yazi"
   assert_contains "$base_script" "install_npm_global_package opencode opencode-ai"
   assert_contains "$base_script" "install_npm_global_package codex @openai/codex"
-  assert_contains "$base_script" 'eval "$(atuin init bash)"'
+  assert_not_contains "$base_script" "install_atuin"
+  assert_contains "$base_script" 'comment_line_if_present '\''eval "$(atuin init bash)"'\'''
+  assert_not_contains "$base_script" 'add_line_if_missing '\''eval "$(atuin init bash)"'\'''
   assert_contains "$base_script" "configure_static_ipv4_network"
   assert_contains "$base_script" "comment_line_if_present"
   assert_contains "$base_script" "alias ls='eza'"
@@ -77,7 +78,7 @@ for distro in ubuntu fedora; do
   assert_contains "$lib_script" "comment_line_if_present()"
   assert_contains "$lib_script" "install_npm_global_package()"
   assert_contains "$lib_script" "install_lazygit()"
-  assert_contains "$lib_script" "install_atuin()"
+  assert_not_contains "$lib_script" "install_atuin()"
   assert_contains "$lib_script" "install_yazi()"
   assert_contains "$lib_script" "install_lm_studio()"
   assert_contains "$lib_script" "https://lmstudio.ai/download/latest/linux/x64?format=AppImage"

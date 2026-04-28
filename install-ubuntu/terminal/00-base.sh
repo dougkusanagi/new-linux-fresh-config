@@ -67,11 +67,10 @@ success "Shell aliases configured: ls, ll, la, l, bat, fd, bottom"
 
 install_dust
 install_lazygit
-install_atuin
 install_yazi
 install_npm_global_package opencode opencode-ai
 install_npm_global_package codex @openai/codex
-add_line_if_missing 'eval "$(atuin init bash)"' "$TARGET_HOME/.bashrc"
+comment_line_if_present 'eval "$(atuin init bash)"' "$TARGET_HOME/.bashrc"
 
 apt_install podman
 if [[ "$DRY_RUN" == "true" ]]; then

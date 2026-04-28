@@ -528,50 +528,6 @@ install_lazygit() {
   success "lazygit installed"
 }
 
-install_atuin() {
-  if command_exists atuin; then
-    log "atuin is already available."
-    return
-  fi
-
-  if [[ "$DRY_RUN" == "true" ]]; then
-    log "[DRY-RUN] Would install atuin from GitHub releases"
-    return
-  fi
-
-  local target tmpdir url binary
-  case "$(uname -m)" in
-    x86_64|amd64)
-      target="x86_64-unknown-linux-gnu"
-      ;;
-    aarch64|arm64)
-      target="aarch64-unknown-linux-gnu"
-      ;;
-    *)
-      error "Unsupported atuin architecture: $(uname -m)"
-      return 1
-      ;;
-  esac
-
-  url="$(github_latest_asset_url "atuinsh/atuin" "atuin-${target}\\.tar\\.gz$")"
-  if [[ -z "$url" ]]; then
-    error "Could not find an atuin release asset for $target."
-    return 1
-  fi
-
-  tmpdir="$(mktemp -d)"
-  run_quiet bash -lc "curl -sSfL '$url' | tar xz -C '$tmpdir'"
-  binary="$(find "$tmpdir" -type f -name atuin -perm /111 | head -n 1)"
-  if [[ -z "$binary" ]]; then
-    rm -rf "$tmpdir"
-    error "Could not find the atuin binary in the release archive."
-    return 1
-  fi
-  run_quiet sudo install -m 0755 "$binary" /usr/local/bin/atuin
-  rm -rf "$tmpdir"
-  success "atuin installed"
-}
-
 install_yazi() {
   if command_exists yazi && command_exists ya; then
     log "yazi is already available."
